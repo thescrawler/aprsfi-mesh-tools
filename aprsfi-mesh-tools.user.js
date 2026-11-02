@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         aprs.fi Mesh Tools (beta)
 // @namespace    https://greasyfork.org/users/aprsfi-mesh-overlay
-// @version      1.0.8-beta
+// @version      1.1.0-beta
 // @description  One easy panel for aprs.fi: see MeshCore & Meshtastic radios on the map, check roughly where a repeater can reach, and hide map clutter. Bundles Mesh Overlay, Mesh Coverage and Map Layer Toggles.
 // @author       aprsfi-mesh-overlay contributors
 // @license      MIT
@@ -44,7 +44,7 @@
 (function () {
   'use strict';
   const W = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : (typeof window !== 'undefined' ? window : globalThis);
-  const VERSION = '1.0.8-beta';
+  const VERSION = '1.1.0-beta';
   const TAG = '[mesh-tools]';
   const WIKI_URL = 'https://github.com/thescrawler/aprsfi-mesh-tools/blob/main/docs/Home.md'; // 📖 Help / Wiki link in Panel settings
 
@@ -110,10 +110,75 @@
     if (start >= 0) segs.push(start, n);
     return Uint16Array.from(segs);
   }
+
+  // ----- signal-strength mode (1.1.0): free-space + Deygout knife-edge diffraction (<=3 edges) vs a LoRa link budget -----
+  const LORA_SNR = { 5: -2.5, 6: -5, 7: -7.5, 8: -10, 9: -12.5, 10: -15, 11: -17.5, 12: -20 }; // demod floor per SF (Semtech)
+  const RADIO_DEF = { freq: 910.525, sf: 7, bw: 62.5 }; // MeshCore US default
+  const LINK_DEF = { txDbm: 22, gainDbi: 3, nfDb: 6 };
+  const MARGIN_STRONG = 10, MARGIN_MARGINAL = 0;
+  // receiver sensitivity (dBm) = thermal noise -174 dBm/Hz + 10log10(BW) + noise figure + required SNR for the SF
+  function loraSens(sf, bwKHz, nf) {
+    sf = Math.round(+sf); if (!(sf in LORA_SNR)) sf = RADIO_DEF.sf; bwKHz = +bwKHz > 0 ? +bwKHz : RADIO_DEF.bw;
+    return -174 + 10 * Math.log10(bwKHz * 1000) + (nf != null ? nf : LINK_DEF.nfDb) + LORA_SNR[sf];
+  }
+  const fsplDb = (dM, fMHz) => 20 * Math.log10(dM / 1000) + 20 * Math.log10(fMHz) + 32.44;
+  const planeEarthDb = (dM, ht, hr) => 40 * Math.log10(dM) - 20 * Math.log10(ht * hr);
+  const knifeJ = v => (v <= -0.78 ? 0 : 6.9 + 20 * Math.log10(Math.sqrt((v - 0.1) * (v - 0.1) + 1) + v - 0.1)); // ITU-R P.526
+  // highest-v edge strictly between sample a and b (heights already include earth bulge); ha/hb = end heights ASL
+  function bestEdge(dist, elev, a, b, ha, hb, lambda, near) {
+    const da = dist[a], D = dist[b] - da; let best = -Infinity, bi = -1;
+    if (D <= 0) return [bi, best];
+    for (let j = a + 1; j < b; j++) {
+      const d1 = dist[j] - da; if (dist[j] <= near) continue;
+      const d2 = D - d1, h = elev[j] - (ha + (hb - ha) * d1 / D), v = h * Math.sqrt(2 * D / (lambda * d1 * d2));
+      if (v > best) { best = v; bi = j; }
+    }
+    return [bi, best];
+  }
+  // Deygout: main edge, then one sub-edge each side (max 3 edges)
+  function deygoutDb(dist, elev, i, h0, hr, lambda, near) {
+    const [m, vm] = bestEdge(dist, elev, 0, i, h0, hr, lambda, near);
+    if (m < 0 || vm <= -0.78) return 0;
+    const hm = elev[m];
+    const [, vl] = bestEdge(dist, elev, 0, m, h0, hm, lambda, near), [, vr] = bestEdge(dist, elev, m, i, hm, hr, lambda, near);
+    return knifeJ(vm) + (vl > -0.78 ? knifeJ(vl) : 0) + (vr > -0.78 ? knifeJ(vr) : 0);
+  }
+  // o: { range, step, rx, freqMHz, txDbm, gainDbi, sensDbm, near? } -> Uint16Array [start, end, level, ...] level 2 strong / 1 marginal
+  function computeRaySignal(getElev, lat, lon, brg, o, h0) {
+    const n = Math.floor(o.range / o.step), elev = new Float32Array(n + 1), dist = new Float32Array(n + 1);
+    const near = o.near != null ? o.near : NEAR_M, lambda = 299792458 / (o.freqMHz * 1e6);
+    elev[0] = h0 - (o.txAgl || 0); // ground under antenna (not used as an obstacle)
+    for (let i = 1; i <= n; i++) {
+      const d = i * o.step, p = destPoint(lat, lon, brg, d);
+      let e = getElev(p[0], p[1]); if (!isFinite(e)) e = 0;
+      dist[i] = d; elev[i] = e - d * d / (2 * K_FACTOR * R_EARTH);
+    }
+    // running sum of path ground, for effective antenna heights in the 2-ray (plane-earth) term
+    const cum = new Float64Array(n + 1); for (let i = 1; i <= n; i++) cum[i] = cum[i - 1] + elev[i];
+    // evaluate the receiver every `stride` samples (<= ~300 points/ray keeps Deygout O(n) scans cheap), fill between
+    const stride = Math.max(1, Math.ceil(n / 300)), budget = o.txDbm + 2 * o.gainDbi - o.sensDbm;
+    const lvl = new Uint8Array(n + 1);
+    for (let i = stride; i <= n + stride - 1; i += stride) {
+      const k = Math.min(i, n), hr = elev[k] + o.rx;
+      // basic loss = worse of free space and plane-earth (ground reflection, matters for low antennas on flat ground);
+      // effective heights are above the path's mean ground, never less than the real mast heights
+      const mean = cum[k] / k, ht = Math.max(o.txAgl || 1, h0 - mean), hrE = Math.max(o.rx, hr - mean);
+      const basic = Math.max(fsplDb(dist[k], o.freqMHz), planeEarthDb(dist[k], ht, hrE));
+      const margin = budget - basic - deygoutDb(dist, elev, k, h0, hr, lambda, near);
+      const L = margin >= MARGIN_STRONG ? 2 : margin >= MARGIN_MARGINAL ? 1 : 0;
+      for (let j = Math.max(1, k - stride + 1); j <= k; j++) lvl[j] = L;
+      if (k === n) break;
+    }
+    const segs = []; let start = 1;
+    for (let i = 2; i <= n + 1; i++) {
+      if (i > n || lvl[i] !== lvl[start]) { if (lvl[start]) segs.push(start, i - 1, lvl[start]); start = i; }
+    }
+    return Uint16Array.from(segs);
+  }
   // ===== /LOSCORE =====
 
   if (typeof module !== 'undefined' && typeof GM_xmlhttpRequest === 'undefined') {
-    module.exports = { computeRay, lonLatToTilePx, destPoint, TILE_Z, DETAIL, TILE_CAP, NEAR_M, tileUrl, tileRange, effZoom, stepForZ }; return;
+    module.exports = { computeRay, lonLatToTilePx, destPoint, TILE_Z, DETAIL, TILE_CAP, NEAR_M, tileUrl, computeRaySignal, loraSens, fsplDb, planeEarthDb, knifeJ, deygoutDb, LORA_SNR, RADIO_DEF, LINK_DEF, MARGIN_STRONG, MARGIN_MARGINAL, tileRange, effZoom, stepForZ }; return;
   }
   if (W.__meshToolsActive) return; // installed twice
   W.__meshToolsActive = VERSION;
@@ -193,7 +258,7 @@
         out.push({ src: 'meshcore', lat, lon, name: (n.adv_name || '').trim() || '(unnamed)',
           typeId: n.type, type: MC_TYPES[n.type] || ('type ' + n.type),
           heard: n.last_advert ? Date.parse(n.last_advert) : (n.updated_date ? Date.parse(n.updated_date) : 0),
-          id: n.public_key ? n.public_key.slice(0, 12) : '', key: n.public_key ? String(n.public_key) : '', fields: mcFields(n) });
+          id: n.public_key ? n.public_key.slice(0, 12) : '', key: n.public_key ? String(n.public_key) : '', fields: mcFields(n), params: n.params || null });
       }
       return out;
     }
@@ -358,15 +423,17 @@
       showsMeshcore: () => state.active && !!state.show.meshcore && !!state.map && state.map.getZoom() >= CFG.minZoom,
       // slim repeater/room list for Coverage, derived from already-downloaded data (avoids a 2nd big download)
       slimMeshcore: () => state.data.meshcore && state.data.meshcore.filter(n => (n.typeId === 2 || n.typeId === 3) && n.key && Math.abs(n.lat) <= 85)
-        .map(n => [n.key.slice(0, 16), n.name.slice(0, 40), n.typeId, +n.lat.toFixed(5), +n.lon.toFixed(5), n.heard || 0])
+        .map(n => [n.key.slice(0, 16), n.name.slice(0, 40), n.typeId, +n.lat.toFixed(5), +n.lon.toFixed(5), n.heard || 0, slimRadio(n.params)])
     };
   })();
 
   // =====================================================================
+  // [freq MHz, SF, BW kHz] or 0 when the node didn't report its radio settings
+  function slimRadio(p) { return p && +p.freq > 100 && +p.freq < 6000 ? [+p.freq, +p.sf || 0, +p.bw || 0] : 0; }
   // MODULE 2: Coverage (from aprsfi-mesh-coverage 0.4.0)
   // =====================================================================
   const COVERAGE = (function () {
-    const OPTS = { age: [7, 30, 90], tx: [1, 3, 6, 10, 15, 25], rx: [1, 2, 5, 10], rays: [180, 360] };
+    const OPTS = { age: [7, 30, 90], tx: [1, 3, 6, 10, 15, 25], rx: [1, 2, 5, 10], rays: [180, 360], txp: [14, 17, 20, 22, 27, 30], gain: [0, 2, 3, 5, 6, 8] };
     // ---------- antenna heights: stored in METRES, shown/typed in the user's unit (ft or m) ----------
     const H_MIN_M = 0.3, H_MAX_M = 100, M_PER_FT = 0.3048;
     const validM = (v, d) => (isFinite(+v) && +v >= H_MIN_M && +v <= H_MAX_M ? +v : d);
@@ -430,6 +497,8 @@
       age: pick(GM_getValue('cv_age', 30), OPTS.age, 30), tx: validM(GM_getValue('cv_tx', 3), 3),
       rx: validM(GM_getValue('cv_rx', 2), 2), range: validKm(GM_getValue('cv_range', 20 * KM_PER_MI), 20 * KM_PER_MI),
       rays: pick(GM_getValue('cv_rays', 360), OPTS.rays, 360), fresnel: GM_getValue('cv_fresnel', false),
+      mode: GM_getValue('cv_mode', 'signal') === 'los' ? 'los' : 'signal',
+      txp: pick(GM_getValue('cv_txp', LINK_DEF.txDbm), OPTS.txp, LINK_DEF.txDbm), gain: pick(GM_getValue('cv_gain', LINK_DEF.gainDbi), OPTS.gain, LINK_DEF.gainDbi),
       enabled: GM_getValue('cv_enabled', true), allRep: GM_getValue('cv_all', false),
       detail: DETAIL[GM_getValue('cv_detail', 'balanced')] ? GM_getValue('cv_detail', 'balanced') : 'balanced'
     };
@@ -440,10 +509,13 @@
     const PALETTE = [[30, 136, 229], [67, 160, 71], [216, 27, 96], [0, 172, 193], [94, 53, 177], [192, 202, 51], [109, 76, 65], [84, 110, 122]];
     const rgb = c => `rgb(${c.join(',')})`;
     const MARK_MAX = 400;
-    const settingsKey = () => [S.tx, S.rx, S.range, S.rays, S.fresnel ? 1 : 0, S.detail].join('_');
+    const settingsKey = () => [S.mode, S.txp, S.gain, S.tx, S.rx, S.range, S.rays, S.fresnel ? 1 : 0, S.detail].join('_');
+    // the node's own radio settings when it reported them, else the MeshCore US default
+    const siteRadio = s => { const r = Array.isArray(s.radio) ? s.radio : []; return [r[0] || RADIO_DEF.freq, LORA_SNR[r[1]] != null ? r[1] : RADIO_DEF.sf, r[2] > 0 ? r[2] : RADIO_DEF.bw]; };
     const siteZ = s => effZoom(S.detail, s.lat, s.lon, s.range * 1000);
     // per-site key: pins may override tx height / range, so the key uses the site's effective values
-    const siteKey = s => s.id + '@' + [s.tx, S.rx, s.range, S.rays, S.fresnel ? 1 : 0, stepForZ(siteZ(s))].join('_');
+    const modeKey = s => S.mode === 'los' ? 'los' : ['sig', S.txp, S.gain].concat(siteRadio(s)).join('~');
+    const siteKey = s => s.id + '@' + [modeKey(s), s.tx, S.rx, s.range, S.rays, S.fresnel ? 1 : 0, stepForZ(siteZ(s))].join('_');
 
     const st = { map: null, L: null, nodes: null, loading: false, err: '', layers: {}, timer: null,
       queue: [], busy: false, pinMode: false, pins: GM_getValue('cv_pins', []), mem: new Map(), gen: 0, reopen: null };
@@ -460,9 +532,9 @@
       const used = Object.values(st.sel).map(v => v.c), cnt = PALETTE.map((_, i) => used.filter(u => u === i).length);
       return cnt.indexOf(Math.min(...cnt));
     }
-    function nodeSite(id, name, kind, lat, lon, last) {
+    function nodeSite(id, name, kind, lat, lon, last, radio) {
       const sl = st.sel[id], h = st.nodeH[id];
-      return { id, name: name || '(unnamed)', kind, lat, lon, last, tx: h != null ? h : S.tx, range: S.range,
+      return { id, name: name || '(unnamed)', kind, lat, lon, last, radio: radio || 0, tx: h != null ? h : S.tx, range: S.range,
         selected: !!sl, col: sl ? PALETTE[sl.c % PALETTE.length] : (COLORS[kind] || COLORS[2]) };
     }
     const layerKey = s => siteKey(s) + '#' + (s.col || COLORS.pin).join('.');
@@ -556,12 +628,15 @@
       const g = getElev(site.lat, site.lon);
       if (!isFinite(g)) throw new Error('no elevation at site');
       site.g = g;
-      const o = { range: site.range * 1000, step, rx: S.rx, fresnel: S.fresnel, freqMHz: 915 };
+      const [fMHz, sf, bw] = siteRadio(site), sig = S.mode !== 'los';
+      const o = { range: site.range * 1000, step, rx: S.rx, fresnel: S.fresnel, freqMHz: sig ? fMHz : 915, txAgl: site.tx,
+        txDbm: S.txp, gainDbi: S.gain, sensDbm: loraSens(sf, bw) };
+      const ray = sig ? computeRaySignal : computeRay;
       const h0 = g + site.tx, segs = []; // antenna ASL = sampled ground (nearest z11 terrarium px) + AGL height
       let t0 = performance.now();
       for (let i = 0; i < S.rays; i++) {
         if (cancelled()) return null;
-        segs.push(computeRay(getElev, site.lat, site.lon, i / S.rays * 2 * Math.PI, o, h0));
+        segs.push(ray(getElev, site.lat, site.lon, i / S.rays * 2 * Math.PI, o, h0));
         if (performance.now() - t0 > 25) { await yieldUI(); t0 = performance.now(); }
       }
       return segs;
@@ -573,20 +648,21 @@
       const cv = document.createElement('canvas'); cv.width = cv.height = px;
       const ctx = cv.getContext('2d'), col = site.col || COLORS[site.kind] || COLORS[2];
       ctx.fillStyle = `rgb(${col.join(',')})`;
-      const n = segs.length, half = Math.PI / n * 1.02;
+      const n = segs.length, half = Math.PI / n * 1.02, sig = S.mode !== 'los', w = sig ? 3 : 2;
       for (let i = 0; i < n; i++) {
         const brg = i / n * 2 * Math.PI, a = brg - Math.PI / 2; // canvas angle: 0 = east, bearing 0 = north
         const s = segs[i];
-        for (let j = 0; j < s.length; j += 2) {
+        for (let j = 0; j < s.length; j += w) {
+          ctx.globalAlpha = sig && s[j + 2] === 1 ? 0.4 : 1; // marginal = light, strong = solid
           const r0 = Math.max(0, (s[j] - 0.5) * step * sc), r1 = (s[j + 1] + 0.5) * step * sc;
           ctx.beginPath(); ctx.arc(c, c, r1, a - half, a + half); ctx.arc(c, c, r0, a + half, a - half, true); ctx.closePath(); ctx.fill();
         }
       }
-      ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.setLineDash([6, 6]);
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.setLineDash([6, 6]);
       ctx.beginPath(); ctx.arc(c, c, c - 1, 0, 2 * Math.PI); ctx.stroke();
       const dLat = range / 111320, dLon = range / (111320 * Math.cos(site.lat * Math.PI / 180));
       const ov = L.imageOverlay(cv.toDataURL('image/png'), [[site.lat - dLat, site.lon - dLon], [site.lat + dLat, site.lon + dLon]],
-        { opacity: 0.35, pane: 'meshCoverage', interactive: false });
+        { opacity: sig ? 0.5 : 0.35, pane: 'meshCoverage', interactive: false });
       const m = L.circleMarker([site.lat, site.lon], { radius: site.kind === 'pin' ? 10 : 6, color: '#000', weight: 1, fillColor: `rgb(${col.join(',')})`,
         fillOpacity: 1, pane: 'meshCoverage', bubblingMouseEvents: false });
       const po = { minWidth: 230, maxWidth: 290, autoPanPadding: [20, 20] };
@@ -653,6 +729,11 @@
       $('.del').addEventListener('click', () => { st.map.closePopup(); st.pins = st.pins.filter(q => q.id !== p.id); savePins(); refresh(); });
       return el;
     }
+    function estTxt(site) {
+      if (S.mode === 'los') return ', line of sight' + (S.fresnel ? ', 60% F1' : '');
+      const [f, sf, bw] = siteRadio(site);
+      return `, signal: ${S.txp} dBm, ${f.toFixed(1)} MHz SF${sf}/${bw} kHz${Array.isArray(site.radio) ? '' : ' (default)'}. Solid = strong, light = weak`;
+    }
     // ---------- per-node popup (repeater / room server) ----------
     function nodePopup(site, embed) {
       const L = st.L, id = site.id, el = document.createElement('div'); el.className = 'cv-pp' + (embed ? ' cv-embed' : '');
@@ -665,7 +746,7 @@
         <div>Antenna above sea level: <b class="asl">–</b></div>
         <div class="r">Antenna height ${hBox('h')} <span class="s hft"></span></div>
         <div class="s herr" style="color:#b71c1c"></div>
-        <div class="s">Estimate: your antenna ${fmtH(S.rx)} up, ${fmtD(S.range)}${S.fresnel ? ', 60% F1' : ''}</div>
+        <div class="s">Estimate: your antenna ${fmtH(S.rx)} up, ${fmtD(S.range)}${estTxt(site)}</div>
         <div class="s st"></div>
         <div class="act"><button type="button" class="tg"></button></div>`;
       if (L.DomEvent) { L.DomEvent.disableClickPropagation(el); L.DomEvent.disableScrollPropagation(el); }
@@ -688,7 +769,7 @@
         { allowBlank: true, def: () => S.tx, err: $('.herr'), onUnit: upd });
       $('.tg').addEventListener('click', () => {
         if (st.sel[id]) { delete st.sel[id]; st.map.closePopup(); apply(); }
-        else { st.sel[id] = { n: site.name, k: site.kind, lat: site.lat, lon: site.lon, l: site.last || 0, c: nextColor() }; upd(); apply('Computing…'); }
+        else { st.sel[id] = { n: site.name, k: site.kind, lat: site.lat, lon: site.lon, l: site.last || 0, r: site.radio || 0, c: nextColor() }; upd(); apply('Computing…'); }
       });
       return el;
     }
@@ -701,7 +782,7 @@
       let n = 0;
       for (const v of vis) {
         if (drawnIds.has(v[0])) continue; if (++n > MARK_MAX) break;
-        const site = nodeSite(v[0], v[1], v[2], v[3], v[4], v[5]);
+        const site = nodeSite(v[0], v[1], v[2], v[3], v[4], v[5], v[6]);
         L.circleMarker([site.lat, site.lon], { radius: 6, color: '#000', weight: 1, fillColor: rgb(site.col), fillOpacity: 0.85,
           pane: 'meshCoverage', bubblingMouseEvents: false })
           .bindPopup(() => nodePopup(site), { minWidth: 230, maxWidth: 290, autoPanPadding: [20, 20] }).addTo(st.marks);
@@ -742,7 +823,7 @@
       const ll = src && src.getLatLng ? src.getLatLng() : null;
       const lat = mn && isFinite(mn.lat) ? +mn.lat : (ll ? ll.lat : cached && cached[3]), lon = mn && isFinite(mn.lon) ? +mn.lon : (ll ? ll.lng : cached && cached[4]);
       if (!isFinite(lat) || !isFinite(lon)) return null;
-      return nodeSite(id, (mn && mn.name) || (cached && cached[1]) || (sl && sl.n), type, lat, lon, (mn && mn.heard) || (cached && cached[5]) || 0);
+      return nodeSite(id, (mn && mn.name) || (cached && cached[1]) || (sl && sl.n), type, lat, lon, (mn && mn.heard) || (cached && cached[5]) || 0, (cached && cached[6]) || (sl && sl.r) || 0);
     }
     function onPopupOpen(e) {
       const popup = e.popup, root = popup && popup._contentNode;
@@ -763,14 +844,14 @@
         name: p.name || ('Pin ' + p.lat.toFixed(4) + ', ' + p.lon.toFixed(4)), tx: p.h != null ? p.h : S.tx, range: p.r != null ? p.r : S.range, col: COLORS.pin });
       st.vis = []; st.lastTotal = 0;
       if (!S.enabled) return out;
-      for (const [id, v] of Object.entries(st.sel)) out.push(nodeSite(id, v.n, v.k, v.lat, v.lon, v.l)); // always, ignores cap/view
+      for (const [id, v] of Object.entries(st.sel)) out.push(nodeSite(id, v.n, v.k, v.lat, v.lon, v.l, v.r)); // always, ignores cap/view
       if (st.map.getZoom() < CFG.minZoom || !st.nodes) return out;
       const b = st.map.getBounds().pad(0.2), c = st.map.getCenter(), cut = Date.now() - S.age * 86400e3;
       const vis = st.nodes.filter(n => ((n[2] === 2 && S.showRep) || (n[2] === 3 && S.showRoom)) && n[5] >= cut && b.contains([n[3], n[4]]));
       vis.sort((a, z) => ((a[3] - c.lat) ** 2 + (a[4] - c.lng) ** 2) - ((z[3] - c.lat) ** 2 + (z[4] - c.lng) ** 2));
       st.vis = vis;
       if (S.allRep) {
-        for (const n of vis.filter(n => !st.sel[n[0]]).slice(0, CFG.maxNodes)) out.push(nodeSite(n[0], n[1], n[2], n[3], n[4], n[5]));
+        for (const n of vis.filter(n => !st.sel[n[0]]).slice(0, CFG.maxNodes)) out.push(nodeSite(n[0], n[1], n[2], n[3], n[4], n[5], n[6]));
         st.lastTotal = vis.length;
       }
       return out;
@@ -834,7 +915,7 @@
           const lat = +n.adv_lat, lon = +n.adv_lon;
           if (!isFinite(lat) || !isFinite(lon) || (lat === 0 && lon === 0) || Math.abs(lat) > 85) continue;
           out.push([String(n.public_key).slice(0, 16), (n.adv_name || '').trim().slice(0, 40), n.type,
-            +lat.toFixed(5), +lon.toFixed(5), Date.parse(n.last_advert) || 0]);
+            +lat.toFixed(5), +lon.toFixed(5), Date.parse(n.last_advert) || 0, slimRadio(n.params)]);
         }
         st.nodes = out; st.err = '';
         try { GM_setValue('cv_nodes', { t: Date.now(), n: out }); } catch (e) { console.warn(TAG, 'node cache store failed', e); }
@@ -868,6 +949,8 @@
         <div class="mt-row"><span id="cv-selc"></span><button type="button" id="cv-clrsel" class="sm">Clear</button></div>
         <button type="button" id="cv-pin" title="Check what a radio at any spot could reach"></button>
         <button type="button" id="cv-clrpin">Remove my pins</button>
+        <div class="mt-row" title="What the shading means"><span class="lb">Map shows</span><select id="cv-mode"><option value="signal"${S.mode !== 'los' ? ' selected' : ''}>Signal strength</option><option value="los"${S.mode === 'los' ? ' selected' : ''}>Clear view only</option></select></div>
+        <div class="info" id="cv-legend"></div>
         <details class="adv"><summary>Advanced</summary>
           <label title="Draws coverage for every nearby repeater automatically. Slow on phones."><input type="checkbox" id="cv-all"><span>Show ALL nearby repeaters<small>(slow)</small></span></label>
           <label><input type="checkbox" id="cv-rep"><span><i class="dot" style="background:#e53935"></i>Include repeaters</span></label>
@@ -879,7 +962,9 @@
           <div class="mt-row" id="cv-rgrow" title="How far out to check"><span class="lb">Farthest distance</span><span class="ig"><select id="cv-range" class="dv"></select><select id="cv-dunit" class="hu" title="Miles or kilometres"><option value="mi">mi</option><option value="km">km</option></select></span></div>
           <div class="mt-row" title="Sharper = more accurate, slower to load"><span class="lb">Terrain detail<small>Sharper = more accurate, slower to load</small></span><select id="cv-detail">${Object.entries(DETAIL).map(([k, d]) => `<option value="${k}" title="${d.res} terrain grid"${k === S.detail ? ' selected' : ''}>${d.label}</option>`).join('')}</select></div>
           ${sel('cv-rays', 'Smoothness', 'More = smoother but slower', OPTS.rays, S.rays, '')}
-          <label title="Stricter check that leaves extra clearance over hills (915 MHz)"><input type="checkbox" id="cv-fr"><span>Strict mode (Fresnel 60%)</span></label>
+          ${sel('cv-txp', 'Repeater power', 'Transmit power used for Signal strength', OPTS.txp, S.txp, ' dBm')}
+          ${sel('cv-gain', 'Antenna gain (each)', 'Antenna gain at both ends, for Signal strength', OPTS.gain, S.gain, ' dBi')}
+          <label title="Stricter check that leaves extra clearance over hills (915 MHz)"><input type="checkbox" id="cv-fr"><span>Strict mode (Fresnel 60%)<small>(Clear view only)</small></span></label>
           <button type="button" id="cv-clr">Clear saved results</button>
         </details>
         <div class="info">This is an estimate from hills only. Trees and buildings are not included. Terrain: AWS Terrain Tiles. Nodes: map.meshcore.io</div>`;
@@ -888,7 +973,9 @@
       const cb = (id, key, gk, recompute) => { const e = $id(id); e.checked = S[key]; e.addEventListener('change', () => { S[key] = e.checked; GM_setValue(gk, e.checked); if (!state.active) return; recompute ? settingsChanged() : refresh(); }); };
       cb('cv-en', 'enabled', 'cv_enabled'); cb('cv-rep', 'showRep', 'cv_rep'); cb('cv-room', 'showRoom', 'cv_room'); cb('cv-all', 'allRep', 'cv_all'); cb('cv-fr', 'fresnel', 'cv_fresnel', true);
       const sl = (id, key, opts, recompute) => $id(id).addEventListener('change', e => { S[key] = pick(e.target.value, opts, S[key]); GM_setValue('cv_' + key, S[key]); if (!state.active) return; recompute ? settingsChanged() : refresh(); });
-      sl('cv-age', 'age', OPTS.age); sl('cv-rays', 'rays', OPTS.rays, 1);
+      sl('cv-age', 'age', OPTS.age); sl('cv-rays', 'rays', OPTS.rays, 1); sl('cv-txp', 'txp', OPTS.txp, 1); sl('cv-gain', 'gain', OPTS.gain, 1);
+      const leg = () => { const e = $id('cv-legend'); if (e) e.innerHTML = S.mode === 'los' ? 'Shaded = clear view of the repeater over the hills.' : '<b>Solid</b> = strong signal · <b>light</b> = weak, may work · none = unlikely'; };
+      leg(); $id('cv-mode').addEventListener('change', e => { S.mode = e.target.value === 'los' ? 'los' : 'signal'; GM_setValue('cv_mode', S.mode); leg(); if (state.active) settingsChanged(); });
       $id('cv-pin').addEventListener('click', () => { if (!state.active) return; st.pinMode = !st.pinMode; updPinBtn(); idleStatus(Object.keys(st.layers).length); });
       $id('cv-clrsel').addEventListener('click', () => { st.sel = {}; saveSel(); if (!state.active) return; st.map.closePopup(); refresh(); });
       $id('cv-clrpin').addEventListener('click', () => { st.pins = []; savePins(); if (!state.active) return; st.map.closePopup(); refresh(); });
@@ -1297,6 +1384,9 @@
     'cv-range': 'How far out from the repeater to check. Bigger takes longer to work out.',
     'cv-detail': 'How fine the hill map is. Sharp catches small ridges but downloads more and is slower.',
     'cv-rays': 'How many directions are checked around the repeater. More = smoother shading, but slower.',
+    'cv-mode': 'Signal strength (recommended) estimates how strong the repeater would be, including signal bending over hills. Solid shading is strong, light shading is weak but may work. Clear view only shades places with a straight, unblocked line to the repeater (the older, stricter method).',
+    'cv-txp': 'How much power the repeater transmits. Most MeshCore repeaters use 22 dBm. Only used for Signal strength.',
+    'cv-gain': 'Antenna gain, used for both the repeater and your radio. A typical small antenna is about 3 dBi. Only used for Signal strength.',
     'cv-fr': 'Requires extra clearance above hills (Fresnel zone). More realistic, shows less coverage.',
     'cv-clr': 'Deletes saved coverage results so they are worked out again from scratch.',
     'mt-wiki': 'Opens the full Mesh Tools help pages in a new tab: install steps, every setting explained, and fixes for common problems.',

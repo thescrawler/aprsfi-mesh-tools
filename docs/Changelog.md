@@ -1,5 +1,11 @@
 # 📝 Changelog
 
+## Nov 2, 2026: 1.1.0-beta
+- New default **Signal strength** coverage map: free-space/ground-reflection loss plus Deygout knife-edge diffraction over up to 3 ridges, checked against a LoRa link budget. Solid = strong (≥10 dB to spare), light = weak (0-10 dB), clear = unlikely.
+- Uses each node's own frequency, SF and bandwidth from map.meshcore.io when it reports them, otherwise the MeshCore US default (910.525 MHz, SF7, 62.5 kHz, about -127.5 dBm).
+- New **Map shows** choice (Signal strength / Clear view only). Repeater power (22 dBm) and Antenna gain (3 dBi each) are under Advanced. All have ⓘ info buttons.
+- The old line-of-sight check is still there as *Clear view only*. The 100 m hillside fix applies to both modes.
+
 ## Nov 2, 2026: 1.0.8-beta
 - Coverage fix: the antenna's own hillside (ground within 100 m of it) no longer blocks coverage. This fixes repeaters pinned just off a summit or on a slope, where whole directions used to show as uncovered.
 

@@ -19,9 +19,13 @@ Only nodes that reach the internet through MQTT appear on meshmap.net, the sourc
 It must be listed on map.meshcore.io (it has to have advertised a position that reached the map). Also check the *heard* filter and that you're zoomed in to zoom 6 or closer.
 
 **How accurate is the coverage?**
-It's a terrain-only line-of-sight estimate. It's good for seeing which hills block a repeater, but it ignores trees, buildings, power and antenna gain. See [How the estimate works](Coverage.md#how-the-estimate-works).
+By default (**Signal strength**, since 1.1.0) it estimates signal level from distance, signal bending over hills and a typical LoRa link budget, then shades strong (solid) and weak (light) areas. It ignores trees and buildings. **Clear view only** is the older, stricter line-of-sight check. See [How the estimate works](Coverage.md#how-the-estimate-works).
+
+**Why did coverage grow a lot in 1.1.0?**
+The old check treated any hill in the way as a hard stop. Real signals bend over ridges and lose some strength. A high site like a mountain-top repeater now shows the basin below it as strong or weak coverage instead of patchy blobs. Switch **Map shows** to **Clear view only** for the old picture.
 
 **What's Strict mode?**
+Only used by *Clear view only*.
 It also requires most (60%) of the radio "Fresnel zone" around the signal path to be clear, which is closer to what a solid link needs. It shows less coverage. See [Strict mode](Coverage.md#strict-mode-fresnel-60).
 
 **Which detail level should I use?**

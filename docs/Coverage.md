@@ -2,7 +2,7 @@
 
 The Coverage tab shades the area a **MeshCore repeater** (or any spot you choose) can probably reach, based on the **shape of the land**. Hills block radio signals. This tool works out, direction by direction, where the hills get in the way.
 
-> ⚠️ **It's an estimate, not a guarantee.** It uses bare-earth terrain only. Trees, buildings, radio power, antenna gain and interference are **not** included. Read [Limitations](#limitations) below.
+> ⚠️ **It's an estimate, not a guarantee.** It uses bare-earth terrain only. Trees, buildings and interference are **not** included. Radio power and antenna gain are only rough defaults you can change under Advanced. Read [Limitations](#limitations) below.
 
 ---
 
@@ -11,7 +11,7 @@ The Coverage tab shades the area a **MeshCore repeater** (or any spot you choose
 1. **Zoom in** to zoom level 9 or closer (about county level). Further out, the status line says *"Zoom in closer to pick a repeater"*.
 2. Tap a red **◆R** repeater (or a purple **◆S** room server). In its popup, tap **Show coverage**.
 3. The status line shows progress, e.g. `1/1 Hilltop: Loading terrain 37/110`, then `Computing…`.
-4. A shaded area appears in that repeater's own colour, with a **dashed circle** marking the distance limit. Inside the circle, shaded = probably reachable, clear = probably blocked by terrain.
+4. A shaded area appears in that repeater's own colour, with a **dashed circle** marking the distance limit. With **Signal strength** (the default), **solid** shading = strong signal, **light** shading = weak but may work, clear = unlikely.
 5. To compare repeaters, tap more of them and tap **Show coverage** on each. Each one gets its own colour (8 colours rotate).
 6. To test a spot with no repeater, open the Coverage tab and tap **📍 Drop a pin to test a spot**, then tap the map. Pins are **orange**.
 
@@ -27,6 +27,7 @@ If the 📡 Mesh nodes tab is showing MeshCore nodes, the coverage controls appe
 | **"N picked" / None picked yet**, **Clear** | How many repeaters you've picked with *Show coverage*. **Clear** un-picks them all. |
 | **📍 Drop a pin to test a spot** | Tap it, then tap the map to place one pin (tap the button again to cancel). You can keep up to **10 pins**. Adding an 11th removes the oldest. |
 | **Remove my pins** | Deletes every pin and its shading. |
+| **Map shows** | **Signal strength** (default, since 1.1.0): estimates how strong the repeater would be, including signal bending over hills. **Clear view only**: the older method, which shades only places with a straight, unblocked line to the repeater. |
 
 ### Repeater popup (📶 Coverage section)
 
@@ -91,11 +92,17 @@ How finely the hills are measured. Each level loads terrain tiles at a different
 - **Rough first-load times** on typical home broadband, for 20 mi: Fast a few seconds, Balanced ~5–15 s, Sharp ~20–60 s. Phones on mobile data can be much slower. Tiles already in memory (up to 600) are reused, so the next repeater nearby is quicker.
 - Sharp catches small ridges and valleys that Fast smooths over, so it's more accurate in rugged country. On flat land the difference is small.
 
+### ♻️ Repeater power
+Default **22 dBm** (the usual MeshCore repeater setting). Choices: 14, 17, 20, 22, 27, 30 dBm. Only used by *Signal strength*.
+
+### ♻️ Antenna gain (each)
+Default **3 dBi**, applied to both the repeater and your radio. Choices: 0, 2, 3, 5, 6, 8 dBi. Only used by *Signal strength*.
+
 ### ♻️ Smoothness
 **180** or **360 (default)** directions (rays) are checked around each repeater, i.e. one every 2° or every 1°. More rays give smoother edges, but take longer to compute.
 
 ### ♻️ Strict mode (Fresnel 60%)
-Default **off**. Normal mode only asks "can the two antennas *see* each other over the hills?". Strict mode also requires **60% of the first Fresnel zone** to be clear. That's the football-shaped region around the direct line that radio waves need for a strong signal, worked out for **915 MHz**. It is more realistic for a reliable link, and shows **less** coverage. It is also slower, especially at Sharp detail.
+Only used by *Clear view only*. Default **off**. Normal mode only asks "can the two antennas *see* each other over the hills?". Strict mode also requires **60% of the first Fresnel zone** to be clear. That's the football-shaped region around the direct line that radio waves need for a strong signal, worked out for **915 MHz**. It is more realistic for a reliable link, and shows **less** coverage. It is also slower, especially at Sharp detail.
 
 ### Clear saved results
 Throws away saved coverage results, the saved repeater list, and terrain tiles in memory. Everything is then worked out and downloaded again. Use it if something looks wrong or stuck.
@@ -117,6 +124,17 @@ For each repeater or pin:
 
 Results are saved (in Tampermonkey's storage) for the **60 most recently computed** repeater/setting combinations, so reloading the page redraws them instantly. Changing a setting that affects the result gives a new combination, which is computed fresh.
 
+### Signal strength mode (default since 1.1.0)
+
+Steps 1 to 4 are the same. Then, every few hundred metres along each ray, the script works out how much signal would be left:
+
+- **Distance loss:** the worse of free-space loss at the node's frequency and "plane-earth" loss (ground reflection, which matters for low antennas over flat ground). Antenna heights for that part are measured above the average ground along the path, so a mountain-top repeater gets credit for its height.
+- **Hill loss:** **Deygout knife-edge diffraction** over up to **3 ridges** (the worst ridge, then the worst one on each side of it). Signals can bend over a ridge and lose some strength, instead of stopping dead.
+- **Link budget:** repeater power (default 22 dBm) + antenna gain at both ends (default 3 dBi each) - losses, compared with the receiver's **sensitivity**. Sensitivity is worked out from the node's own **spreading factor (SF)** and **bandwidth** when it reports them on map.meshcore.io: `-174 + 10·log10(BW in Hz) + 6 dB noise figure + the SNR that SF needs`. Otherwise it uses the MeshCore US default of 910.525 MHz, SF7, 62.5 kHz (about **-127.5 dBm**).
+- **Shading:** at least **10 dB** to spare = **strong** (solid). **0 to 10 dB** to spare = **weak** (light). Less = not shaded.
+
+Ground within 100 m of the antenna never counts as a ridge, in either mode.
+
 ### Terrain data
 
 Hill heights come from **AWS Terrain Tiles** (the open "terrarium" elevation tiles on Amazon S3, from the AWS Open Data registry). In the USA these are largely based on **USGS 3DEP** (formerly NED) elevation data. Elsewhere they mix sources such as SRTM, so detail and accuracy vary by country. Mesh Tools stores heights to the nearest **1 m**. Where there's no data, the ground is treated as sea level (0 m). If there's no height at the antenna itself, that repeater shows an error ("no hill/terrain data for that spot").
@@ -126,9 +144,9 @@ Hill heights come from **AWS Terrain Tiles** (the open "terrarium" elevation til
 ## Limitations
 
 - **Bare earth only.** Trees, forests, buildings and other clutter are not included. In towns and woodland, real coverage is usually **smaller** than shown.
-- **No power, antenna gain, cable loss, noise or receiver sensitivity.** Nothing works out whether the signal is *strong enough*. A shaded spot only means "no hill in the way". Distant spots in the shade may still be too weak.
+- **Power and gain are defaults.** *Signal strength* uses a simple link budget, with no cable loss, local noise or interference. *Clear view only* doesn't check signal strength at all, so distant shaded spots may still be too weak.
 - **Your settings are guesses.** Default heights apply unless you set per-repeater heights. Repeater positions are whatever the node advertised.
-- **One frequency (915 MHz) for Strict mode,** and no reflection, diffraction over ridges, or ducting. Real signals sometimes reach "blocked" areas, especially near ridge tops.
+- **Simplified physics.** Signal strength uses knife-edge diffraction (max 3 ridges) and a simple ground-reflection term, not a full Longley-Rice model. It doesn't include ducting. *Clear view only* ignores diffraction completely and uses 915 MHz for Strict mode.
 - **Terrain resolution.** Small features narrower than the detail level can be missed. Sharp helps, within the tile cap.
 - **Flat-map geometry.** Rays use a local flat approximation, which is fine within the 81 km maximum distance.
 - **Two-way, but not symmetric in reality.** The test is about the line between antennas. Real links also depend on both radios' power and gain.

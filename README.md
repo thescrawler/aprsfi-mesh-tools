@@ -20,7 +20,7 @@ Tampermonkey keeps it updated automatically from this repository. A Greasy Fork 
 
 ## Beta
 
-This is **beta** software. Coverage is a bare-earth line-of-sight *estimate* only. Trees, buildings, power and antenna gain are not modelled. Please report problems in [Issues](https://github.com/thescrawler/aprsfi-mesh-tools/issues).
+This is **beta** software. Coverage is a bare-earth signal-strength *estimate* only (terrain diffraction plus a typical LoRa link budget). Trees and buildings are not modelled. Please report problems in [Issues](https://github.com/thescrawler/aprsfi-mesh-tools/issues).
 
 Not affiliated with aprs.fi, MeshCore or Meshtastic.
 
