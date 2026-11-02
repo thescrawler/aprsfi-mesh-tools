@@ -10,6 +10,8 @@ A Tampermonkey userscript that adds **MeshCore and Meshtastic nodes**, **terrain
 2. **[👉 One-click install aprs.fi Mesh Tools](https://github.com/thescrawler/aprsfi-mesh-tools/raw/main/aprsfi-mesh-tools.user.js)**
 3. Open <https://aprs.fi>. The 🛰️ Mesh Tools panel appears in the bottom-right corner.
 
+**On a phone?** Chrome can't run extensions. On Android, install Tampermonkey in **Firefox** or **Microsoft Edge** and open the install link there. On iPhone/iPad, install the **Tampermonkey** app, turn it on in **Settings, Safari, Extensions** (allow all websites), and open the link in **Safari**. If you only see code, you're in a browser without Tampermonkey. [Details](docs/Installation.md#installing-on-a-phone)
+
 Tampermonkey keeps it updated automatically from this repository. A Greasy Fork listing is coming later.
 
 ## Documentation

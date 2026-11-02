@@ -9,6 +9,10 @@
 5. **Did you drag it off somewhere odd?** The panel is kept on screen automatically. If it's in the way, double-tap its drag bar or use **⚙ Panel settings, Put this box back in the corner**.
 6. **Bot check page.** If aprs.fi shows a "checking your browser" or verification page, complete it normally. The panel appears on the real map page afterwards.
 
+## On my phone, the install link just shows code
+
+You're in a browser without Tampermonkey. Chrome on a phone can't run extensions. On Android, use Firefox or Edge with Tampermonkey; on iPhone/iPad, use Safari with the Tampermonkey app turned on. Then open the install link in that browser. See [Installing on a phone](Installation.md#installing-on-a-phone).
+
 ## "⚠ Old scripts are still on" / a tab says it's turned off
 
 An older separate script is still running. Turn it off in the Tampermonkey Dashboard and reload. See [Installation, Step 3](Installation.md#step-3-turn-off-the-old-separate-scripts-if-you-had-them).

@@ -11,6 +11,8 @@ It takes about five minutes. You only do it once.
 
 ## Step 1: install Tampermonkey
 
+On a phone? Skip to [Installing on a phone](#installing-on-a-phone).
+
 ### Google Chrome (Windows, Mac, Linux, ChromeOS)
 
 1. Open the [Tampermonkey page on the Chrome Web Store](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo) and click **Add to Chrome**, then **Add extension**.
@@ -33,20 +35,6 @@ It takes about five minutes. You only do it once.
 1. Open [Tampermonkey on Firefox Add-ons](https://addons.mozilla.org/firefox/addon/tampermonkey/), then click **Add to Firefox** and **Add**.
 2. No extra switch is needed.
 
-### Firefox for Android
-
-Chrome for Android does not support extensions, so use **Firefox**.
-
-1. Install **Firefox** from the Google Play Store.
-2. In Firefox, tap **⋮**, then **Extensions** (or **Add-ons**), then **Find more extensions**. Search for **Tampermonkey** and tap **Add**.
-3. Continue with Step 2 below *inside Firefox*.
-
-The panel is designed for touch. On phones, controls are taller and the ⓘ buttons have larger tap areas.
-
-### iPhone / iPad (not supported, untested)
-
-iOS Safari cannot run Tampermonkey. The free **Userscripts** app (by quoid) for Safari *may* work, but Mesh Tools has **not been tested** on iOS and we can't offer support for it. If you try it, please report what happens at <https://github.com/thescrawler/aprsfi-mesh-tools/issues>.
-
 ---
 
 ## Step 2: install the Mesh Tools script
@@ -67,6 +55,28 @@ The first time the script downloads data, Tampermonkey may ask whether it can co
 | `s3.amazonaws.com` | Terrain (hill height) tiles for coverage |
 
 Choose **Always allow** (or **Always allow domain**) for each. See [Privacy and data sources](Privacy-and-Data-Sources.md) for details.
+
+## Installing on a phone
+
+Chrome on a phone **can't run extensions**, so Tampermonkey won't work there. Use one of these instead.
+
+### Android
+
+1. Install **Firefox** or **Microsoft Edge** from the Google Play Store. (Kiwi Browser also works, but Tampermonkey says it is no longer updated, so Firefox or Edge is safer.)
+2. In that browser, add **Tampermonkey**: in Firefox tap **⋮**, then **Extensions**, and search for Tampermonkey. In Edge tap **☰**, then **Extensions**, and add Tampermonkey.
+3. Open the [one-click install link](https://github.com/thescrawler/aprsfi-mesh-tools/raw/main/aprsfi-mesh-tools.user.js) **in that same browser** (not Chrome) and tap **Install**.
+
+### iPhone / iPad
+
+1. Install the **Tampermonkey** app from the App Store.
+2. Open **Settings**, then **Safari**, then **Extensions** (on newer iOS: **Settings**, **Apps**, **Safari**, **Extensions**). Turn on **Tampermonkey** and set it to **Allow** on **All Websites**.
+3. Open the [one-click install link](https://github.com/thescrawler/aprsfi-mesh-tools/raw/main/aprsfi-mesh-tools.user.js) **in Safari** and tap **Install**.
+
+iPhone/iPad support is new and less tested. If something doesn't work, please tell us at <https://github.com/thescrawler/aprsfi-mesh-tools/issues>.
+
+### Only seeing code?
+
+If tapping the install link just shows a page of code, you're in a browser that doesn't have Tampermonkey (often Chrome). Open the link in the browser where you installed Tampermonkey.
 
 ---
 

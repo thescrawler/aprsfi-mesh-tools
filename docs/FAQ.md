@@ -10,7 +10,7 @@ No. It only adds things to the page in *your* browser. Turning it off or uninsta
 No, it's an independent community project.
 
 **Does it work on my phone?**
-On **Android**, yes, using **Firefox** with Tampermonkey. On **iPhone/iPad**, it's not supported or tested (the *Userscripts* Safari app might work). See [Installation](Installation.md).
+Yes, but not in Chrome. On **Android**, use Firefox or Microsoft Edge with Tampermonkey. On **iPhone/iPad**, use Safari with the Tampermonkey app. If the install link only shows code, you're in a browser without Tampermonkey. See [Installing on a phone](Installation.md#installing-on-a-phone).
 
 **Why don't I see my Meshtastic node?**
 Only nodes that reach the internet through MQTT appear on meshmap.net, the source used here. Also check that it was heard within the *Heard from in the last* period.

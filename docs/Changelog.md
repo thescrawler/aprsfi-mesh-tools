@@ -1,5 +1,8 @@
 # 📝 Changelog
 
+## Nov 2, 2026: Docs: phone install steps
+- Added simple steps for installing on Android and iPhone/iPad, and what to do if the install link only shows code. The script itself did not change.
+
 ## 1.0.7-beta
 - Published on GitHub. Added homepage, support, download and update links to the script header so Tampermonkey auto-updates from GitHub.
 - Help / Wiki link now opens these docs on GitHub.
