@@ -27,7 +27,7 @@ In Tampermonkey's per-script storage:
 - your pins (position, name, height, range) and per-repeater heights
 - the 60 most recent coverage results, and a copy of the repeater list (up to 6 h old)
 
-Terrain tiles are only kept in memory (up to 600) and are gone when you close the tab. **Clear saved results** (Coverage, Advanced) deletes saved results, the repeater list and tiles. Uninstalling the script deletes everything.
+Terrain tiles (public elevation data only, nothing about you) are kept in memory and saved in the browser's IndexedDB for aprs.fi (up to 900 tiles, about 120 MB), so they aren't downloaded again. **Clear saved results** (Coverage, Advanced) deletes saved results, the repeater list and tiles. Uninstalling the script deletes everything.
 
 ## Data credits
 

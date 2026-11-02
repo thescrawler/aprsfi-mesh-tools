@@ -45,7 +45,7 @@ There are more nodes in view than *Most nodes to draw* allows, so the ones neare
 - Use **Terrain detail: Fast** or **Balanced**, and a smaller **Farthest distance**.
 - Turn off **Show ALL nearby repeaters**.
 - Use **Smoothness 180** and turn off **Strict mode**.
-- The first coverage in a new area downloads terrain. Later ones nearby reuse it.
+- The first coverage in a new area downloads terrain (a rough preview shows first). After that the terrain is saved in the browser, so reloads, setting changes and nearby repeaters reuse it.
 
 ## "(area too big for this detail, using lower)"
 

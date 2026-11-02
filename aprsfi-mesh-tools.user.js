@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         aprs.fi Mesh Tools (beta)
 // @namespace    https://greasyfork.org/users/aprsfi-mesh-overlay
-// @version      1.1.0-beta
+// @version      1.1.1-beta
 // @description  One easy panel for aprs.fi: see MeshCore & Meshtastic radios on the map, check roughly where a repeater can reach, and hide map clutter. Bundles Mesh Overlay, Mesh Coverage and Map Layer Toggles.
 // @author       aprsfi-mesh-overlay contributors
 // @license      MIT
@@ -44,7 +44,7 @@
 (function () {
   'use strict';
   const W = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : (typeof window !== 'undefined' ? window : globalThis);
-  const VERSION = '1.1.0-beta';
+  const VERSION = '1.1.1-beta';
   const TAG = '[mesh-tools]';
   const WIKI_URL = 'https://github.com/thescrawler/aprsfi-mesh-tools/blob/main/docs/Home.md'; // 📖 Help / Wiki link in Panel settings
 
@@ -69,7 +69,33 @@
     while (z > 11 && tileRange(lat, lon, rangeM, z).count > TILE_CAP) z--;
     return z;
   }
-  const stepForZ = z => (z >= 13 ? 19 : z === 12 ? 38 : 75);
+  const stepForZ = z => (z >= 13 ? 19 : z === 12 ? 38 : z === 11 ? 75 : 150);
+  // same tiles on S3's second hostname: browsers allow ~6 downloads per host, two hosts = twice as many at once
+  const tileUrl2 = (z, x, y) => `https://elevation-tiles-prod.s3.amazonaws.com/terrarium/${z}/${x}/${y}.png`;
+  // only the tiles that touch the coverage circle (the square's corners are never sampled: ~20% fewer downloads)
+  // innerM: skip tiles lying wholly inside that radius (the ring's coarse tiles)
+  function tilesInCircle(lat, lon, rangeM, z, innerM) {
+    const r = tileRange(lat, lon, rangeM, z), c = lonLatToTilePx(lon, lat, z), out = [];
+    const mpp = 40075016.7 * Math.cos(lat * Math.PI / 180) / (256 * Math.pow(2, z)), rp = rangeM / mpp + 2, ip = innerM ? innerM / mpp - 2 : -1;
+    for (let x = r.x0; x <= r.x1; x++) for (let y = r.y0; y <= r.y1; y++) {
+      const dx = Math.max(x * 256 - c[0], 0, c[0] - (x + 1) * 256), dy = Math.max(y * 256 - c[1], 0, c[1] - (y + 1) * 256);
+      const fx = Math.max(Math.abs(x * 256 - c[0]), Math.abs((x + 1) * 256 - c[0])), fy = Math.max(Math.abs(y * 256 - c[1]), Math.abs((y + 1) * 256 - c[1]));
+      if (dx * dx + dy * dy <= rp * rp && !(ip > 0 && fx * fx + fy * fy < ip * ip)) out.push([x, y, Math.hypot((x + 0.5) * 256 - c[0], (y + 0.5) * 256 - c[1])]);
+    }
+    return out.sort((a, b) => a[2] - b[2]).map(t => [t[0], t[1]]); // nearest first
+  }
+  // quick first picture: 2 zoom levels coarser (16x fewer tiles), only worth it when lots of tiles must be downloaded
+  const PREVIEW = { dz: 2, minZ: 9, minMissing: 24, rays: 180 };
+  const previewZ = z => Math.max(PREVIEW.minZ, z - PREVIEW.dz);
+  // far out, neighbouring rays are further apart than a coarser tile's pixels, so the outer ring uses one zoom
+  // level less (half the downloads at 50 mi; Pine Observatory 35.8% either way, other tests within 0.6 points).
+  // fine terrain is kept where ray spacing < 8 pixels, and always within 15 km.
+  const fineRadius = (z, rays) => Math.max(15000, rays * 8 * stepForZ(z) / (2 * Math.PI));
+  function tilePlan(lat, lon, rangeM, z, rays) {
+    const rin = fineRadius(z, rays);
+    if (z <= PREVIEW.minZ || rin >= rangeM) return { rin: Infinity, fine: tilesInCircle(lat, lon, rangeM, z), coarse: [] };
+    return { rin, fine: tilesInCircle(lat, lon, rin, z), coarse: tilesInCircle(lat, lon, rangeM, z - 1, rin) };
+  }
   function lonLatToTilePx(lon, lat, z) {
     const n = 256 * Math.pow(2, z), s = Math.sin(lat * Math.PI / 180);
     return [(lon + 180) / 360 * n, (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n];
@@ -178,7 +204,7 @@
   // ===== /LOSCORE =====
 
   if (typeof module !== 'undefined' && typeof GM_xmlhttpRequest === 'undefined') {
-    module.exports = { computeRay, lonLatToTilePx, destPoint, TILE_Z, DETAIL, TILE_CAP, NEAR_M, tileUrl, computeRaySignal, loraSens, fsplDb, planeEarthDb, knifeJ, deygoutDb, LORA_SNR, RADIO_DEF, LINK_DEF, MARGIN_STRONG, MARGIN_MARGINAL, tileRange, effZoom, stepForZ }; return;
+    module.exports = { computeRay, lonLatToTilePx, destPoint, TILE_Z, DETAIL, TILE_CAP, NEAR_M, tileUrl, computeRaySignal, loraSens, fsplDb, planeEarthDb, knifeJ, deygoutDb, LORA_SNR, RADIO_DEF, LINK_DEF, MARGIN_STRONG, MARGIN_MARGINAL, tileRange, effZoom, stepForZ, tileUrl2, tilesInCircle, PREVIEW, previewZ, fineRadius, tilePlan }; return;
   }
   if (W.__meshToolsActive) return; // installed twice
   W.__meshToolsActive = VERSION;
@@ -503,7 +529,7 @@
       detail: DETAIL[GM_getValue('cv_detail', 'balanced')] ? GM_getValue('cv_detail', 'balanced') : 'balanced'
     };
     const CFG = { nodesUrl: 'https://map.meshcore.io/api/v1/nodes', nodesTtl: 6 * 3600e3, minZoom: 9, maxNodes: 25,
-      tileLru: 600, debounceMs: 800, resCacheMax: 60 };
+      tileLru: 600, debounceMs: 800, resCacheMax: 60, dlConc: 12 };
     const COLORS = { 2: [229, 57, 53], 3: [142, 36, 170], pin: [255, 143, 0] };
     // distinct colours for individually selected nodes (orange reserved for pins)
     const PALETTE = [[30, 136, 229], [67, 160, 71], [216, 27, 96], [0, 172, 193], [94, 53, 177], [192, 202, 51], [109, 76, 65], [84, 110, 122]];
@@ -515,7 +541,7 @@
     const siteZ = s => effZoom(S.detail, s.lat, s.lon, s.range * 1000);
     // per-site key: pins may override tx height / range, so the key uses the site's effective values
     const modeKey = s => S.mode === 'los' ? 'los' : ['sig', S.txp, S.gain].concat(siteRadio(s)).join('~');
-    const siteKey = s => s.id + '@' + [modeKey(s), s.tx, S.rx, s.range, S.rays, S.fresnel ? 1 : 0, stepForZ(siteZ(s))].join('_');
+    const siteKey = s => s.id + '@' + ['r2', modeKey(s), s.tx, S.rx, s.range, S.rays, S.fresnel ? 1 : 0, stepForZ(siteZ(s))].join('_');
 
     const st = { map: null, L: null, nodes: null, loading: false, err: '', layers: {}, timer: null,
       queue: [], busy: false, pinMode: false, pins: GM_getValue('cv_pins', []), mem: new Map(), gen: 0, reopen: null };
@@ -539,44 +565,92 @@
     }
     const layerKey = s => siteKey(s) + '#' + (s.col || COLORS.pin).join('.');
 
-    // ---------- elevation tiles (LRU) ----------
-    const tiles = new Map(); // key -> Float32Array | Promise | null(failed)
+    // ---------- elevation tiles: memory LRU -> IndexedDB (survives reloads) -> network ----------
+    // 1.1.0 and older downloaded every tile again on each page load through GM_xmlhttpRequest, 6 at a time:
+    // ~19 MB / 156 tiles for one 50 mi repeater, i.e. 3-15 s before any shading appeared.
+    const tiles = new Map(); // key -> Int16Array | Promise | null(failed)
+    const TDB = (() => {
+      const CAP = 900; // ~115 MB of decoded tiles at most, oldest dropped first
+      let dbp = null, keys = null;
+      const open = () => dbp || (dbp = new Promise(res => {
+        try {
+          const r = indexedDB.open('mesh-tools-terrain', 1);
+          r.onupgradeneeded = () => r.result.createObjectStore('t').createIndex('ts', 'ts');
+          r.onsuccess = () => res(r.result); r.onerror = r.onblocked = () => res(null);
+        } catch (e) { res(null); }
+      }).then(db => db && new Promise(res => { // load the key list once so we know what is cached without asking per tile
+        try { const q = db.transaction('t').objectStore('t').getAllKeys(); q.onsuccess = () => { keys = new Set(q.result); res(db); }; q.onerror = () => res(null); } catch (e) { res(null); }
+      })).catch(() => null));
+      const req = (db, mode, fn) => new Promise(res => { try { const t = db.transaction('t', mode), r = fn(t.objectStore('t')); t.oncomplete = () => res(r && r.result); t.onerror = t.onabort = () => res(undefined); } catch (e) { res(undefined); } });
+      let puts = 0;
+      async function prune(db) {
+        if (keys.size <= CAP) return;
+        await req(db, 'readwrite', os => { const c = os.index('ts').openKeyCursor(); let n = keys.size - CAP;
+          c.onsuccess = () => { const cur = c.result; if (!cur || n-- <= 0) return; os.delete(cur.primaryKey); keys.delete(cur.primaryKey); cur.continue(); }; });
+      }
+      return {
+        ready: open,
+        has: k => !!(keys && keys.has(k)),
+        async get(k) { const db = await open(); if (!db || !keys.has(k)) return null; const v = await req(db, 'readonly', os => os.get(k)); return v && v.e ? new Int16Array(v.e) : null; },
+        async put(k, e) { const db = await open(); if (!db) return; await req(db, 'readwrite', os => os.put({ e: e.buffer.slice(0), ts: Date.now() }, k)); keys.add(k); if (++puts % 50 === 0) prune(db); },
+        async flush() { const db = await open(); if (db) await prune(db); },
+        async clear() { const db = await open(); if (!db) return; await req(db, 'readwrite', os => os.clear()); keys.clear(); }
+      };
+    })();
     function decodeTile(blob) {
-      return createImageBitmap(blob).then(bmp => {
+      return createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' }).catch(() => createImageBitmap(blob)).then(bmp => {
         const cv = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(256, 256) : Object.assign(document.createElement('canvas'), { width: 256, height: 256 });
-        const ctx = cv.getContext('2d'); ctx.drawImage(bmp, 0, 0);
+        const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(bmp, 0, 0);
         const d = ctx.getImageData(0, 0, 256, 256).data, e = new Int16Array(65536); // 1 m precision, half the memory
         for (let i = 0, p = 0; i < 65536; i++, p += 4) e[i] = Math.round(d[p] * 256 + d[p + 1] + d[p + 2] / 256 - 32768);
         if (bmp.close) bmp.close(); return e;
       });
     }
+    // plain fetch() first (CORS is open on the tile bucket, no extension round-trip, browser HTTP cache);
+    // GM_xmlhttpRequest only if the page blocks it
+    let useGM = typeof fetch !== 'function';
+    function download(url) {
+      const viaGM = () => gmGet(url, 'blob').then(r => { const b = r.response; return b instanceof Blob ? b : new Blob([b], { type: 'image/png' }); });
+      if (useGM) return viaGM();
+      return fetch(url, { mode: 'cors', credentials: 'omit' }).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+        .catch(e => { if (/HTTP/.test(e.message)) throw e; useGM = true; console.warn(TAG, 'fetch blocked, using GM_xmlhttpRequest', e); return viaGM(); });
+    }
+    const tileCached = (z, x, y) => { const k = z + '/' + x + '/' + y, v = tiles.get(k); return (v != null && !(v instanceof Promise)) || TDB.has(k); };
+    let hostFlip = 0;
     function loadTile(z, x, y) {
       const k = z + '/' + x + '/' + y;
       if (tiles.has(k)) { const v = tiles.get(k); tiles.delete(k); tiles.set(k, v); return Promise.resolve(v); }
-      const p = gmGet(tileUrl(z, x, y), 'blob')
-        .then(r => { let b = r.response; if (!(b instanceof Blob)) b = new Blob([b], { type: 'image/png' }); return decodeTile(b); })
+      const url = (hostFlip++ & 1 ? tileUrl2 : tileUrl)(z, x, y);
+      const p = TDB.get(k).then(v => v || download(url).then(decodeTile).then(e => { TDB.put(k, e); return e; }))
         .catch(e => { console.warn(TAG, 'tile', k, e); return null; })
-        .then(v => { tiles.set(k, v); while (tiles.size > CFG.tileLru) tiles.delete(tiles.keys().next().value); return v; });
+        .then(v => { if (v) tiles.set(k, v); else tiles.delete(k); while (tiles.size > CFG.tileLru) tiles.delete(tiles.keys().next().value); return v; });
       tiles.set(k, p); return p;
     }
-    async function preloadTiles(lat, lon, range, z, onProg, cancelled) {
-      const r = tileRange(lat, lon, range, z), list = [];
-      for (let x = r.x0; x <= r.x1; x++) for (let y = r.y0; y <= r.y1; y++) list.push([x, y]);
+    // list: [[z, x, y], ...] -> Map 'z/x/y' -> Int16Array
+    async function preloadTiles(list, onProg, cancelled) {
+      await TDB.ready();
       const got = new Map(); let i = 0, done = 0;
       const worker = async () => {
         while (i < list.length) {
           if (cancelled && cancelled()) return;
-          const [x, y] = list[i++]; got.set(x + '/' + y, await loadTile(z, x, y)); done++;
+          const [z, x, y] = list[i++]; got.set(z + '/' + x + '/' + y, await loadTile(z, x, y)); done++;
           if (onProg) onProg(done, list.length);
         }
       };
-      await Promise.all([1, 2, 3, 4, 5, 6].map(worker)); // max 6 downloads at once
+      await Promise.all(Array.from({ length: CFG.dlConc }, worker)); // 12 at a time, split over 2 hostnames
       return got;
     }
-    function elevFrom(got, z) {
+    const planList = (s, z, rays) => { const pl = tilePlan(s.lat, s.lon, s.range * 1000, z, rays);
+      return { rin: pl.rin, list: pl.fine.map(t => [z, t[0], t[1]]).concat(pl.coarse.map(t => [z - 1, t[0], t[1]])) }; };
+    const missingTiles = (s, z) => planList(s, z, S.rays).list.filter(t => !tileCached(t[0], t[1], t[2])).length;
+    // fine zoom z inside rin metres of (lat0, lon0), z-1 outside
+    function elevFrom(got, z, lat0, lon0, rin) {
+      const kx = 111320 * Math.cos((lat0 || 0) * Math.PI / 180), r2 = rin * rin;
       return (lat, lon) => {
-        const p = lonLatToTilePx(lon, lat, z), tx = Math.floor(p[0] / 256), ty = Math.floor(p[1] / 256);
-        const t = got.get(tx + '/' + ty); if (!t || t instanceof Promise) return NaN;
+        let zz = z;
+        if (rin < Infinity) { const dy = (lat - lat0) * 111320, dx = (lon - lon0) * kx; if (dx * dx + dy * dy >= r2) zz = z - 1; }
+        const p = lonLatToTilePx(lon, lat, zz), tx = Math.floor(p[0] / 256), ty = Math.floor(p[1] / 256);
+        const t = got.get(zz + '/' + tx + '/' + ty); if (!t || t instanceof Promise) return NaN;
         const px = Math.min(255, Math.floor(p[0] - tx * 256)), py = Math.min(255, Math.floor(p[1] - ty * 256));
         return t[py * 256 + px];
       };
@@ -585,7 +659,7 @@
     async function sampleGround(lat, lon) {
       const z = (DETAIL[S.detail] || DETAIL.balanced).z;
       const p = lonLatToTilePx(lon, lat, z), x = Math.floor(p[0] / 256), y = Math.floor(p[1] / 256);
-      const got = new Map([[x + '/' + y, await loadTile(z, x, y)]]); return elevFrom(got, z)(lat, lon);
+      const got = new Map([[z + '/' + x + '/' + y, await loadTile(z, x, y)]]); return elevFrom(got, z, lat, lon, Infinity)(lat, lon);
     }
 
     // ---------- results cache (memory + GM, compact) ----------
@@ -614,17 +688,25 @@
     }
     function clearCache() {
       const idx = GM_getValue('cv_res_idx', {}); for (const k of Object.keys(idx)) GM_deleteValue('cv_res_' + k);
-      GM_deleteValue('cv_res_idx'); GM_deleteValue('cv_nodes'); st.mem.clear(); tiles.clear(); st.nodes = null;
+      GM_deleteValue('cv_res_idx'); GM_deleteValue('cv_nodes'); st.mem.clear(); tiles.clear(); TDB.clear(); st.nodes = null;
       for (const l of Object.values(st.layers)) st.map.removeLayer(l.ov); st.layers = {};
     }
 
-    // ---------- compute (chunked) ----------
-    const yieldUI = () => new Promise(r => (W.requestAnimationFrame ? requestAnimationFrame(() => setTimeout(r, 0)) : setTimeout(r, 0)));
-    async function computeSite(site, cancelled, onProg) {
-      const z = siteZ(site), step = stepForZ(z);
-      const got = await preloadTiles(site.lat, site.lon, site.range * 1000, z, onProg, cancelled);
+    // ---------- compute (chunked, so the map stays responsive) ----------
+    // a Web Worker would need a blob: URL, which strict page CSPs block; the compute is ~0.5 s for 50 mi,
+    // so it runs in ~25 ms slices instead. scheduler.yield / MessageChannel avoid the ~16 ms rAF wait per slice.
+    const yieldUI = (() => {
+      if (W.scheduler && typeof W.scheduler.yield === 'function') return () => W.scheduler.yield();
+      if (typeof MessageChannel === 'function') { const ch = new MessageChannel(), q = []; ch.port1.onmessage = () => { const r = q.shift(); if (r) r(); }; return () => new Promise(r => { q.push(r); ch.port2.postMessage(0); }); }
+      return () => new Promise(r => setTimeout(r, 0));
+    })();
+    // preview: coarse terrain + half the rays, shown while the full-detail tiles download
+    async function computeSite(site, cancelled, onProg, preview) {
+      const z = preview ? previewZ(siteZ(site)) : siteZ(site), step = stepForZ(z), rays = preview ? Math.min(S.rays, PREVIEW.rays) : S.rays;
+      const plan = preview ? { rin: Infinity, list: tilesInCircle(site.lat, site.lon, site.range * 1000, z).map(t => [z, t[0], t[1]]) } : planList(site, z, rays);
+      const got = await preloadTiles(plan.list, onProg, cancelled);
       if (cancelled()) return null;
-      const getElev = elevFrom(got, z);
+      const getElev = elevFrom(got, z, site.lat, site.lon, plan.rin);
       const g = getElev(site.lat, site.lon);
       if (!isFinite(g)) throw new Error('no elevation at site');
       site.g = g;
@@ -632,19 +714,20 @@
       const o = { range: site.range * 1000, step, rx: S.rx, fresnel: S.fresnel, freqMHz: sig ? fMHz : 915, txAgl: site.tx,
         txDbm: S.txp, gainDbi: S.gain, sensDbm: loraSens(sf, bw) };
       const ray = sig ? computeRaySignal : computeRay;
-      const h0 = g + site.tx, segs = []; // antenna ASL = sampled ground (nearest z11 terrarium px) + AGL height
+      const h0 = g + site.tx, segs = []; // antenna ASL = sampled ground (nearest terrarium px) + AGL height
       let t0 = performance.now();
-      for (let i = 0; i < S.rays; i++) {
+      for (let i = 0; i < rays; i++) {
         if (cancelled()) return null;
-        segs.push(ray(getElev, site.lat, site.lon, i / S.rays * 2 * Math.PI, o, h0));
-        if (performance.now() - t0 > 25) { await yieldUI(); t0 = performance.now(); }
+        segs.push(ray(getElev, site.lat, site.lon, i / rays * 2 * Math.PI, o, h0));
+        if (performance.now() - t0 > 25) { if (onProg) onProg(-1, i / rays); await yieldUI(); t0 = performance.now(); }
       }
-      return segs;
+      segs.step = step; return segs;
     }
 
     // ---------- render: raster ImageOverlay of covered patches ----------
-    function render(site, segs) {
-      const L = st.L, range = site.range * 1000, px = 512, c = px / 2, sc = c / range, step = stepForZ(siteZ(site));
+    function render(site, segs, step) {
+      const L = st.L, range = site.range * 1000, px = 512, c = px / 2, sc = c / range;
+      step = step || segs.step || stepForZ(siteZ(site));
       const cv = document.createElement('canvas'); cv.width = cv.height = px;
       const ctx = cv.getContext('2d'), col = site.col || COLORS[site.kind] || COLORS[2];
       ctx.fillStyle = `rgb(${col.join(',')})`;
@@ -788,9 +871,10 @@
           .bindPopup(() => nodePopup(site), { minWidth: 230, maxWidth: 290, autoPanPadding: [20, 20] }).addTo(st.marks);
       }
     }
-    function addLayer(k, s, r) {
+    function addLayer(k, s, r, pv) {
       if (isFinite(r.g)) s.g = r.g;
-      const grp = render(s, r.segs).addTo(st.map); st.layers[k] = { ov: grp };
+      const old = st.layers[k]; if (old) st.map.removeLayer(old.ov); // replace the preview in place
+      const grp = render(s, r.segs, r.step).addTo(st.map); st.layers[k] = { ov: grp, pv: !!pv };
       if (st.reopen != null && st.reopen === (s.kind === 'pin' ? s.pinId : s.id)) { st.reopen = null; setTimeout(() => grp._cvMarker.openPopup(), 50); }
     }
     // ---------- integration with aprsfi-mesh-overlay ----------
@@ -865,34 +949,44 @@
       for (const k of Object.keys(st.layers)) if (!ids.has(k)) { st.map.removeLayer(st.layers[k].ov); delete st.layers[k]; }
       const todo = [];
       for (const s of want) {
-        const k = layerKey(s); if (st.layers[k]) continue;
+        const k = layerKey(s); if (st.layers[k] && !st.layers[k].pv) continue;
         const r = resGet(siteKey(s)); if (r) { addLayer(k, s, r); continue; }
         todo.push(s);
       }
       st.queue = todo; runQueue();
       if (!todo.length) idleStatus(want.length);
     }
+    // two passes: a quick coarse picture for every waiting site first, then full detail (tiles are shared and cached)
     async function runQueue() {
       if (st.busy) return; st.busy = true;
       const gen = st.gen; let done = 0, errs = 0;
       while (st.queue.length && gen === st.gen) {
-        const total = done + st.queue.length, s = st.queue.shift(), k = siteKey(s);
+        const s = st.queue.shift(), k = siteKey(s);
         if (!st.wantKeys.has(k)) continue; // deselected / scrolled away while queued
-        const pre = `${done + 1}/${total} ${s.name}: `; status(pre + 'Computing…');
+        { const l = st.layers[layerKey(s)]; if (l && !l.pv) continue; } // already finished (queued twice by a pan)
+        await TDB.ready();
+        const z = siteZ(s), pz = previewZ(z), lk0 = layerKey(s);
+        const preview = !s._pv && pz < z && !st.layers[lk0] && missingTiles(s, z) >= PREVIEW.minMissing;
+        const total = done + st.queue.length + 1, pre = `${done + 1}/${total} ${s.name}: `;
+        const want = (DETAIL[S.detail] || DETAIL.balanced).z, note = !preview && z < want ? ' (area too big for this detail, using lower)' : '';
+        status(pre + (preview ? 'Quick preview…' : 'Computing…'), 0);
+        const t0 = performance.now();
         try {
-          const z = siteZ(s), want = (DETAIL[S.detail] || DETAIL.balanced).z;
-          const note = z < want ? ' (area too big for this detail, using lower)' : '';
-          const segs = await computeSite(s, () => gen !== st.gen || !st.wantKeys.has(k),
-            (a, b) => { if (gen === st.gen) status(a < b ? `${pre}Loading terrain ${a}/${b}${note}` : pre + 'Computing…'); });
+          const segs = await computeSite(s, () => gen !== st.gen || !st.wantKeys.has(k), (a, b) => {
+            if (gen !== st.gen) return;
+            if (a < 0) status(pre + (preview ? 'Quick preview…' : 'Working out coverage…'), 0.85 + 0.15 * b);
+            else status(`${pre}${preview ? 'Quick preview: terrain' : 'Loading terrain'} ${a}/${b}${note}`, 0.85 * a / b);
+          }, preview);
           if (segs && gen === st.gen) {
-            resPut(k, segs, s.g);
+            if (!preview) resPut(k, segs, s.g);
             const w = (st.want || []).find(x => siteKey(x) === k);
-            if (w) { const lk = layerKey(w); if (!st.layers[lk]) { w.g = s.g; addLayer(lk, w, { segs, g: s.g }); } }
+            if (w) { const lk = layerKey(w), cur = st.layers[lk]; if (!cur || cur.pv) { w.g = s.g; addLayer(lk, w, { segs, g: s.g, step: segs.step }, preview); } }
+            if (preview) { s._pv = 1; st.queue.push(s); } else done++;
+            console.log(TAG, (preview ? 'preview ' : 'coverage ') + s.name + ' z' + (preview ? pz : z) + ' ' + Math.round(performance.now() - t0) + ' ms');
           }
-        } catch (e) { errs++; st.err = "Couldn't work out coverage for " + s.name + ' (' + friendly(e) + ')'; }
-        done++;
+        } catch (e) { errs++; done++; st.err = "Couldn't work out coverage for " + s.name + ' (' + friendly(e) + ')'; }
       }
-      st.busy = false;
+      st.busy = false; TDB.flush();
       if (gen !== st.gen) return runQueue();
       idleStatus(Object.keys(st.layers).length, errs);
     }
@@ -924,7 +1018,11 @@
     }
 
     // ---------- UI (lives in the "Coverage" tab) ----------
-    function status(t) { const e = $id('cv-st'); if (e) e.textContent = t; }
+    // f: 0..1 shows the progress bar, undefined hides it
+    function status(t, f) {
+      const e = $id('cv-st'); if (e) e.textContent = t;
+      const b = $id('cv-prog'); if (b) { b.style.display = f == null ? 'none' : ''; b.firstChild.style.width = Math.round(Math.max(0.03, Math.min(1, f || 0)) * 100) + '%'; }
+    }
     function idleStatus(n) {
       let t;
       if (!S.enabled) t = 'Coverage is off';
@@ -944,6 +1042,7 @@
       return `
         <div class="hint">Shows roughly where a repeater's signal can reach over hills (shaded area). <b>Tap a red ◆R repeater</b>, then <b>Show coverage</b>.</div>
         <div id="cv-st" class="info"></div>
+        <div id="cv-prog" title="Loading progress" style="display:none;height:6px;margin:4px 0;border-radius:3px;background:#d6dbe1;overflow:hidden"><i style="display:block;height:100%;width:0;background:#1e6fd9;transition:width .2s"></i></div>
         <div id="cv-err" class="card err" style="display:none"><span class="msg"></span><button type="button" id="cv-retry">↻ Retry</button></div>
         <label title="Turn coverage features on or off"><input type="checkbox" id="cv-en"><span><b>Coverage on</b></span></label>
         <div class="mt-row"><span id="cv-selc"></span><button type="button" id="cv-clrsel" class="sm">Clear</button></div>
@@ -1021,6 +1120,7 @@
     }
     return { sectionHtml, wire, init, disable, isActive: () => state.active, isBusy: () => st.loading || st.busy,
       _detail: { DETAIL, effZoom, stepForZ, tileRange, tileUrl, siteZ, siteKey, get: () => S.detail },
+      _perf: { missingTiles, tileCached, layers: () => Object.values(st.layers).map(l => ({ pv: l.pv })), busy: () => st.busy, viaGM: () => useGM },
       _units: { parseH, toU, fromU, fmtH, setUnit, unit: () => UNIT, S, toD, fromD, fmtD, setDUnit, dunit: () => DUNIT, rangeOpts } };
   })();
 

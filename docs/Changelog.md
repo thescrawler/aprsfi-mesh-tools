@@ -1,5 +1,12 @@
 # 📝 Changelog
 
+## Nov 2, 2026: 1.1.1-beta
+- Coverage loads much faster. Pine Observatory at 50 mi, Balanced: about 2 s on a fresh browser, down from about 3.7 s. On a 10 Mbps line it is about 6 s, down from 16 s. A rough picture appears in under 1.5 s.
+- Terrain tiles are now saved in the browser (IndexedDB, up to 900 tiles), so after a reload, or when you change a setting, a new map takes about 0.6 s instead of downloading everything again.
+- Only tiles that touch the coverage circle are downloaded, nearest first, 12 at a time from two S3 addresses. Beyond about 34 km the map uses one terrain level coarser, which halves the download with almost no change in the result.
+- A quick low-detail preview is drawn first, then replaced by the full map. A progress bar shows how far along it is.
+- Clear saved results now also clears the saved terrain.
+
 ## Nov 2, 2026: 1.1.0-beta
 - New default **Signal strength** coverage map: free-space/ground-reflection loss plus Deygout knife-edge diffraction over up to 3 ridges, checked against a LoRa link budget. Solid = strong (≥10 dB to spare), light = weak (0-10 dB), clear = unlikely.
 - Uses each node's own frequency, SF and bandwidth from map.meshcore.io when it reports them, otherwise the MeshCore US default (910.525 MHz, SF7, 62.5 kHz, about -127.5 dBm).

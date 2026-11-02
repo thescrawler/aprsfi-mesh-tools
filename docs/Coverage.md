@@ -105,7 +105,7 @@ Default **3 dBi**, applied to both the repeater and your radio. Choices: 0, 2, 3
 Only used by *Clear view only*. Default **off**. Normal mode only asks "can the two antennas *see* each other over the hills?". Strict mode also requires **60% of the first Fresnel zone** to be clear. That's the football-shaped region around the direct line that radio waves need for a strong signal, worked out for **915 MHz**. It is more realistic for a reliable link, and shows **less** coverage. It is also slower, especially at Sharp detail.
 
 ### Clear saved results
-Throws away saved coverage results, the saved repeater list, and terrain tiles in memory. Everything is then worked out and downloaded again. Use it if something looks wrong or stuck.
+Throws away saved coverage results, the saved repeater list, and terrain tiles saved in the browser. Everything is then worked out and downloaded again. Use it if something looks wrong or stuck.
 
 ---
 
@@ -137,7 +137,7 @@ Ground within 100 m of the antenna never counts as a ridge, in either mode.
 
 ### Terrain data
 
-Hill heights come from **AWS Terrain Tiles** (the open "terrarium" elevation tiles on Amazon S3, from the AWS Open Data registry). In the USA these are largely based on **USGS 3DEP** (formerly NED) elevation data. Elsewhere they mix sources such as SRTM, so detail and accuracy vary by country. Mesh Tools stores heights to the nearest **1 m**. Where there's no data, the ground is treated as sea level (0 m). If there's no height at the antenna itself, that repeater shows an error ("no hill/terrain data for that spot").
+Hill heights come from **AWS Terrain Tiles** (the open "terrarium" elevation tiles on Amazon S3, from the AWS Open Data registry). In the USA these are largely based on **USGS 3DEP** (formerly NED) elevation data. Elsewhere they mix sources such as SRTM, so detail and accuracy vary by country. Mesh Tools stores heights to the nearest **1 m**. Tiles are saved in your browser (up to 900, oldest dropped first), so reloads and setting changes don't download them again. Only tiles that touch the coverage circle are fetched, nearest first. Beyond about 34 km (or 15 km at low detail) one coarser terrain level is used. In a new area you'll first see a quick low-detail preview with a progress bar, and then the full map replaces it. Where there's no data, the ground is treated as sea level (0 m). If there's no height at the antenna itself, that repeater shows an error ("no hill/terrain data for that spot").
 
 ---
 
