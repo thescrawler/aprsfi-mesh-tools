@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         aprs.fi Mesh Tools (beta)
 // @namespace    https://greasyfork.org/users/aprsfi-mesh-overlay
-// @version      1.0.7-beta
+// @version      1.0.8-beta
 // @description  One easy panel for aprs.fi: see MeshCore & Meshtastic radios on the map, check roughly where a repeater can reach, and hide map clutter. Bundles Mesh Overlay, Mesh Coverage and Map Layer Toggles.
 // @author       aprsfi-mesh-overlay contributors
 // @license      MIT
@@ -44,12 +44,15 @@
 (function () {
   'use strict';
   const W = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : (typeof window !== 'undefined' ? window : globalThis);
-  const VERSION = '1.0.7-beta';
+  const VERSION = '1.0.8-beta';
   const TAG = '[mesh-tools]';
   const WIKI_URL = 'https://github.com/thescrawler/aprsfi-mesh-tools/blob/main/docs/Home.md'; // 📖 Help / Wiki link in Panel settings
 
   // ===== LOSCORE (pure; also loaded by the Node test harness) =====
   const R_EARTH = 6371000, K_FACTOR = 4 / 3, TILE_Z = 11;
+  // near-field: terrain this close to the antenna is its own mounting spot (DEM pixel noise / pin a few px off a
+  // sloped summit). A 3 m mast compared against the next 30-75 m DEM pixel uphill shadowed whole sectors (1.0.7).
+  const NEAR_M = 100;
   // terrain detail levels: terrarium zoom + matching ray sample step (m)
   const DETAIL = { fast: { z: 11, step: 75, label: 'Fast', res: '~75 m' }, balanced: { z: 12, step: 38, label: 'Balanced', res: '~38 m' }, sharp: { z: 13, step: 19, label: 'Sharp', res: '~19 m' } };
   const TILE_CAP = 480; // max tiles for one coverage (Int16 tiles = 128 KB each -> ~60 MB)
@@ -86,7 +89,7 @@
     }
     const segs = []; let start = -1;
     const lambda = 299792458 / (o.freqMHz * 1e6);
-    let maxAng = -Infinity;
+    let maxAng = -Infinity; const near = o.near != null ? o.near : NEAR_M;
     for (let i = 1; i <= n; i++) {
       const D = dist[i], tgt = elev[i] + o.rx;
       let vis;
@@ -96,11 +99,11 @@
         vis = true;
         const slope = (tgt - h0) / D;
         for (let j = 1; j < i; j++) {
-          const d1 = dist[j], r = 0.6 * Math.sqrt(lambda * d1 * (D - d1) / D);
+          const d1 = dist[j]; if (d1 <= near) continue; const r = 0.6 * Math.sqrt(lambda * d1 * (D - d1) / D);
           if (elev[j] + r > h0 + slope * d1) { vis = false; break; }
         }
       }
-      const a = (elev[i] - h0) / D; if (a > maxAng) maxAng = a;
+      if (D > near) { const a = (elev[i] - h0) / D; if (a > maxAng) maxAng = a; }
       if (vis && start < 0) start = i;
       if (!vis && start >= 0) { segs.push(start, i - 1); start = -1; }
     }
@@ -110,7 +113,7 @@
   // ===== /LOSCORE =====
 
   if (typeof module !== 'undefined' && typeof GM_xmlhttpRequest === 'undefined') {
-    module.exports = { computeRay, lonLatToTilePx, destPoint, TILE_Z, DETAIL, TILE_CAP, tileUrl, tileRange, effZoom, stepForZ }; return;
+    module.exports = { computeRay, lonLatToTilePx, destPoint, TILE_Z, DETAIL, TILE_CAP, NEAR_M, tileUrl, tileRange, effZoom, stepForZ }; return;
   }
   if (W.__meshToolsActive) return; // installed twice
   W.__meshToolsActive = VERSION;

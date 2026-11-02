@@ -110,6 +110,7 @@ For each repeater or pin:
 2. **Cast rays.** From the antenna, draw 180 or 360 straight lines out to the *Farthest distance*.
 3. **Sample the ground** along each ray every ~75 / 38 / 19 m (by Terrain detail). Each sample uses the nearest terrain pixel.
 4. **Allow for the curve of the Earth.** Each sample is lowered by `d² / (2 · k · R)`, where *d* is the distance, *R* = 6,371 km and **k = 4/3**. The 4/3 "effective Earth radius" is the standard allowance for radio waves bending slightly in the atmosphere, so you can see a bit further than a straight line would suggest. For example, at 20 mi (32 km) the ground "drops" by about 60 m (200 ft).
+   *Antenna's own hillside (since 1.0.8-beta):* ground within **100 m** of the antenna is never treated as blocking. That ground is the spot the antenna is mounted on. A pin a few metres off a summit, or on a slope, used to have the next terrain pixel uphill hide whole directions from a short mast.
 5. **Line-of-sight test.** A point counts as covered if a straight line from the repeater antenna to a radio held at *Your height* above that point clears every hill in between.
 6. **Strict mode test (optional).** Instead, every point in between must sit below the line by at least 60% of the first Fresnel zone radius, `0.6 · √(λ · d₁ · d₂ / D)`, with λ for 915 MHz.
 7. **Draw.** Covered stretches of every ray are painted as wedges on a 512 × 512 image at 35% opacity, placed over the map with a dashed circle at the distance limit.

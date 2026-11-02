@@ -1,5 +1,8 @@
 # 📝 Changelog
 
+## Nov 2, 2026: 1.0.8-beta
+- Coverage fix: the antenna's own hillside (ground within 100 m of it) no longer blocks coverage. This fixes repeaters pinned just off a summit or on a slope, where whole directions used to show as uncovered.
+
 ## Nov 2, 2026: Docs: phone install steps
 - Added simple steps for installing on Android and iPhone/iPad, and what to do if the install link only shows code. The script itself did not change.
 
