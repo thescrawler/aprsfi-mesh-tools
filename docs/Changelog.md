@@ -1,5 +1,8 @@
 # 📝 Changelog
 
+## Nov 2, 2026: 1.1.3-beta
+- **Fix: repeater popups closing the first time.** Clicking a repeater opened its info box, but as soon as you moved the mouse up into it, it disappeared, and you had to click a second time. When a box opens near the edge of the map, the map slides over a little so the box fits. That slide made the script redraw the nodes, and the redraw removed the repeater you had just clicked, which closed its box. Now the redraw leaves the clicked node and its box alone, so one click is enough.
+
 ## Nov 2, 2026: 1.1.2-beta
 - **Big speed fix for Chrome + Tampermonkey.** A 50 mi dropped pin could take a minute or more there, even though it took about 2 s in our tests. Tampermonkey runs scripts inside a protective "sandbox" wrapper, and every bit of maths in the coverage loop (millions of calls) had to go through that wrapper, which made it about 15 times slower. Now the maths runs in a background **Web Worker**, where the wrapper doesn't apply. If a browser blocks workers, the script falls back to running on the page with its own fast copies of the maths functions.
 - Measured in real Chrome with a Tampermonkey-style sandbox, Columbia River Gorge pin, 50 mi, Signal strength, Balanced: **36 s → 2.3 s** the first time (terrain download included), and about **0.01 s** after a reload (saved result).

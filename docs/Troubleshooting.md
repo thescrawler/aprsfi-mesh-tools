@@ -68,6 +68,9 @@ Map layers depend on aprs.fi's internal map code. If aprs.fi changed it, please 
 
 Drag the **⠿ drag to move** bar, or tap the header to collapse the panel. Double-tap the bar to send it back to the corner.
 
+## A repeater's info box closes when I move the mouse to it
+Fixed in 1.1.3-beta. Before that, the first click on a repeater often opened the box and then closed it right away, so you had to click twice. Update the script (Tampermonkey → Utilities → Check for updates) and one click will work.
+
 ## Reporting a problem
 
 Open an issue at <https://github.com/thescrawler/aprsfi-mesh-tools/issues> and include:

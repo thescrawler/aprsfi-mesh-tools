@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         aprs.fi Mesh Tools (beta)
 // @namespace    https://greasyfork.org/users/aprsfi-mesh-overlay
-// @version      1.1.2-beta
+// @version      1.1.3-beta
 // @description  One easy panel for aprs.fi: see MeshCore & Meshtastic radios on the map, check roughly where a repeater can reach, and hide map clutter. Bundles Mesh Overlay, Mesh Coverage and Map Layer Toggles.
 // @author       aprsfi-mesh-overlay contributors
 // @license      MIT
@@ -49,7 +49,7 @@
   const { Math, isFinite, Float32Array, Float64Array, Uint8Array, Uint16Array, Int16Array, Array, Map, Set, Promise, Object, Date, Number, JSON, Error } = globalThis;
   const performance = globalThis.performance || { now: () => Date.now() };
   const W = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : (typeof window !== 'undefined' ? window : globalThis);
-  const VERSION = '1.1.2-beta';
+  const VERSION = '1.1.3-beta';
   const TAG = '[mesh-tools]';
   const WIKI_URL = 'https://github.com/thescrawler/aprsfi-mesh-tools/blob/main/docs/Home.md'; // 📖 Help / Wiki link in Panel settings
 
@@ -368,7 +368,10 @@
     function draw(src) {
       const L = state.L, map = state.map, layer = state.layers[src];
       if (!layer) return;
-      layer.clearLayers();
+      // 1.1.3: keep the marker whose popup is open. Opening a popup can auto-pan the map; the resulting
+      // moveend redraw used to remove that marker and close its popup the first time you clicked it.
+      const pp = map._popup, keep = pp && pp.isOpen && pp.isOpen() && pp._source && layer.hasLayer(pp._source) ? pp._source : null;
+      layer.eachLayer(l => { if (l !== keep) layer.removeLayer(l); });
       if (!state.active) return;
       if (!state.show[src]) return setStatus(src, 'Hidden');
       if (map.getZoom() < CFG.minZoom) return setStatus(src, 'Zoom in closer to see them');
@@ -382,7 +385,9 @@
         vis.sort((a, z) => ((a.lat - c.lat) ** 2 + (a.lon - c.lng) ** 2) - ((z.lat - c.lat) ** 2 + (z.lon - c.lng) ** 2));
         vis = vis.slice(0, CFG.maxMarkersPerLayer);
       }
+      const keepKey = keep && keep.options.meshKey;
       for (const n of vis) {
+        if (keep && (n.key || n.id) === keepKey) continue;
         L.marker([n.lat, n.lon], { icon: icon(n), title: label(n), zIndexOffset: 1000, meshKey: n.key || n.id,
           meshNode: { src: n.src, public_key: n.key || n.id, type: n.typeId, lat: n.lat, lon: n.lon, name: n.name, heard: n.heard } })
           .bindTooltip(esc(label(n)), { direction: 'top', offset: [0, -10] })
@@ -892,15 +897,18 @@
     function drawMarkers(vis, drawnIds) {
       const L = st.L;
       if (!st.marks) st.marks = L.layerGroup().addTo(st.map);
-      st.marks.clearLayers();
+      const pp = st.map._popup, keep = pp && pp.isOpen && pp.isOpen() && pp._source && st.marks.hasLayer(pp._source) ? pp._source : null;
+      st.marks.eachLayer(l => { if (l !== keep) st.marks.removeLayer(l); }); // 1.1.3: don't close an open popup on redraw
       if (overlayActive()) return; // overlay markers carry our controls via popupopen injection
       let n = 0;
       for (const v of vis) {
         if (drawnIds.has(v[0])) continue; if (++n > MARK_MAX) break;
+        if (keep && keep._cvId === v[0]) continue;
         const site = nodeSite(v[0], v[1], v[2], v[3], v[4], v[5], v[6]);
-        L.circleMarker([site.lat, site.lon], { radius: 6, color: '#000', weight: 1, fillColor: rgb(site.col), fillOpacity: 0.85,
+        const cm = L.circleMarker([site.lat, site.lon], { radius: 6, color: '#000', weight: 1, fillColor: rgb(site.col), fillOpacity: 0.85,
           pane: 'meshCoverage', bubblingMouseEvents: false })
           .bindPopup(() => nodePopup(site), { minWidth: 230, maxWidth: 290, autoPanPadding: [20, 20] }).addTo(st.marks);
+        cm._cvId = v[0];
       }
     }
     function addLayer(k, s, r, pv) {
