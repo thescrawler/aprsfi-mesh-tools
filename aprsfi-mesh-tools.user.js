@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         aprs.fi Mesh Tools (beta)
 // @namespace    https://greasyfork.org/users/aprsfi-mesh-overlay
-// @version      1.1.1-beta
+// @version      1.1.2-beta
 // @description  One easy panel for aprs.fi: see MeshCore & Meshtastic radios on the map, check roughly where a repeater can reach, and hide map clutter. Bundles Mesh Overlay, Mesh Coverage and Map Layer Toggles.
 // @author       aprsfi-mesh-overlay contributors
 // @license      MIT
@@ -43,8 +43,13 @@
  */
 (function () {
   'use strict';
+  // 1.1.2: Tampermonkey runs the script inside a with(sandbox-proxy) scope, so every free global (Math, isFinite,
+  // Float32Array...) in the ray loops was a Proxy lookup: ~15x slower (36 s instead of 2.3 s for a 50 mi pin in Chrome).
+  // Binding them locally here makes those lookups plain variable reads; the heavy loop also runs in a Web Worker.
+  const { Math, isFinite, Float32Array, Float64Array, Uint8Array, Uint16Array, Int16Array, Array, Map, Set, Promise, Object, Date, Number, JSON, Error } = globalThis;
+  const performance = globalThis.performance || { now: () => Date.now() };
   const W = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : (typeof window !== 'undefined' ? window : globalThis);
-  const VERSION = '1.1.1-beta';
+  const VERSION = '1.1.2-beta';
   const TAG = '[mesh-tools]';
   const WIKI_URL = 'https://github.com/thescrawler/aprsfi-mesh-tools/blob/main/docs/Home.md'; // 📖 Help / Wiki link in Panel settings
 
@@ -692,14 +697,32 @@
       for (const l of Object.values(st.layers)) st.map.removeLayer(l.ov); st.layers = {};
     }
 
-    // ---------- compute (chunked, so the map stays responsive) ----------
-    // a Web Worker would need a blob: URL, which strict page CSPs block; the compute is ~0.5 s for 50 mi,
-    // so it runs in ~25 ms slices instead. scheduler.yield / MessageChannel avoid the ~16 ms rAF wait per slice.
+    // ---------- compute: Web Worker (own clean global, off the main thread), chunked in-page fallback ----------
     const yieldUI = (() => {
       if (W.scheduler && typeof W.scheduler.yield === 'function') return () => W.scheduler.yield();
       if (typeof MessageChannel === 'function') { const ch = new MessageChannel(), q = []; ch.port1.onmessage = () => { const r = q.shift(); if (r) r(); }; return () => new Promise(r => { q.push(r); ch.port2.postMessage(0); }); }
       return () => new Promise(r => setTimeout(r, 0));
     })();
+    // the worker is built from the LOSCORE function sources, so there is one copy of the maths
+    const WORKER_SRC = () => [
+      `const R_EARTH=${R_EARTH},K_FACTOR=${K_FACTOR},NEAR_M=${NEAR_M},MARGIN_STRONG=${MARGIN_STRONG},MARGIN_MARGINAL=${MARGIN_MARGINAL};`,
+      lonLatToTilePx, destPoint, computeRay, bestEdge, deygoutDb, computeRaySignal, elevFrom,
+      'const fsplDb=' + fsplDb, 'const planeEarthDb=' + planeEarthDb, 'const knifeJ=' + knifeJ,
+      `onmessage=e=>{const m=e.data,got=new Map(m.got),getElev=elevFrom(got,m.z,m.lat,m.lon,m.rin),ray=m.sig?computeRaySignal:computeRay,segs=[];
+        let t0=Date.now();for(let i=0;i<m.rays;i++){segs.push(ray(getElev,m.lat,m.lon,i/m.rays*2*Math.PI,m.o,m.h0));
+        if(Date.now()-t0>100){postMessage({p:i/m.rays});t0=Date.now();}}postMessage({segs},segs.map(s=>s.buffer));};`].join('\n');
+    let wkUrl = null, wkBroken = typeof Worker !== 'function' || W.__meshToolsNoWorker;
+    function workerRays(job, cancelled, onProg) {
+      return new Promise((res, rej) => {
+        let w;
+        try { if (!wkUrl) wkUrl = URL.createObjectURL(new Blob([WORKER_SRC()], { type: 'text/javascript' })); w = new Worker(wkUrl); }
+        catch (e) { rej(e); return; }
+        const iv = setInterval(() => { if (cancelled()) { clearInterval(iv); w.terminate(); res(null); } }, 50);
+        w.onmessage = e => { if (e.data.p != null) { if (onProg) onProg(-1, e.data.p); return; } clearInterval(iv); w.terminate(); res(e.data.segs); };
+        w.onerror = e => { clearInterval(iv); w.terminate(); if (e.preventDefault) e.preventDefault(); rej(new Error('worker: ' + (e.message || 'failed'))); };
+        w.postMessage(job); // tiles are copied (structured clone), the cache keeps its own
+      });
+    }
     // preview: coarse terrain + half the rays, shown while the full-detail tiles download
     async function computeSite(site, cancelled, onProg, preview) {
       const z = preview ? previewZ(siteZ(site)) : siteZ(site), step = stepForZ(z), rays = preview ? Math.min(S.rays, PREVIEW.rays) : S.rays;
@@ -713,13 +736,22 @@
       const [fMHz, sf, bw] = siteRadio(site), sig = S.mode !== 'los';
       const o = { range: site.range * 1000, step, rx: S.rx, fresnel: S.fresnel, freqMHz: sig ? fMHz : 915, txAgl: site.tx,
         txDbm: S.txp, gainDbi: S.gain, sensDbm: loraSens(sf, bw) };
-      const ray = sig ? computeRaySignal : computeRay;
-      const h0 = g + site.tx, segs = []; // antenna ASL = sampled ground (nearest terrarium px) + AGL height
-      let t0 = performance.now();
-      for (let i = 0; i < rays; i++) {
-        if (cancelled()) return null;
-        segs.push(ray(getElev, site.lat, site.lon, i / rays * 2 * Math.PI, o, h0));
-        if (performance.now() - t0 > 25) { if (onProg) onProg(-1, i / rays); await yieldUI(); t0 = performance.now(); }
+      const h0 = g + site.tx; // antenna ASL = sampled ground (nearest terrarium px) + AGL height
+      let segs = null;
+      if (!wkBroken) {
+        const gl = []; for (const [k, v] of got) if (v && !(v instanceof Promise)) gl.push([k, v]);
+        try { segs = await workerRays({ got: gl, z, lat: site.lat, lon: site.lon, rin: plan.rin, rays, o, h0, sig }, cancelled, onProg); computeSite.via = 'worker'; if (!segs) return null; }
+        catch (e) { wkBroken = true; console.warn(TAG, 'Web Worker unavailable, computing on the page', e); }
+      }
+      if (!segs) {
+        computeSite.via = 'page';
+        const ray = sig ? computeRaySignal : computeRay; segs = [];
+        let t0 = performance.now();
+        for (let i = 0; i < rays; i++) {
+          if (cancelled()) return null;
+          segs.push(ray(getElev, site.lat, site.lon, i / rays * 2 * Math.PI, o, h0));
+          if (performance.now() - t0 > 25) { if (onProg) onProg(-1, i / rays); await yieldUI(); t0 = performance.now(); }
+        }
       }
       segs.step = step; return segs;
     }
@@ -1120,7 +1152,7 @@
     }
     return { sectionHtml, wire, init, disable, isActive: () => state.active, isBusy: () => st.loading || st.busy,
       _detail: { DETAIL, effZoom, stepForZ, tileRange, tileUrl, siteZ, siteKey, get: () => S.detail },
-      _perf: { missingTiles, tileCached, layers: () => Object.values(st.layers).map(l => ({ pv: l.pv })), busy: () => st.busy, viaGM: () => useGM },
+      _perf: { missingTiles, tileCached, layers: () => Object.values(st.layers).map(l => ({ pv: l.pv })), busy: () => st.busy, viaGM: () => useGM, via: () => computeSite.via },
       _units: { parseH, toU, fromU, fmtH, setUnit, unit: () => UNIT, S, toD, fromD, fmtD, setDUnit, dunit: () => DUNIT, rangeOpts } };
   })();
 

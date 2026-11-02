@@ -1,5 +1,10 @@
 # 📝 Changelog
 
+## Nov 2, 2026: 1.1.2-beta
+- **Big speed fix for Chrome + Tampermonkey.** A 50 mi dropped pin could take a minute or more there, even though it took about 2 s in our tests. Tampermonkey runs scripts inside a protective "sandbox" wrapper, and every bit of maths in the coverage loop (millions of calls) had to go through that wrapper, which made it about 15 times slower. Now the maths runs in a background **Web Worker**, where the wrapper doesn't apply. If a browser blocks workers, the script falls back to running on the page with its own fast copies of the maths functions.
+- Measured in real Chrome with a Tampermonkey-style sandbox, Columbia River Gorge pin, 50 mi, Signal strength, Balanced: **36 s → 2.3 s** the first time (terrain download included), and about **0.01 s** after a reload (saved result).
+- The map stays responsive while coverage is worked out, because the heavy work is off the page.
+
 ## Nov 2, 2026: 1.1.1-beta
 - Coverage loads much faster. Pine Observatory at 50 mi, Balanced: about 2 s on a fresh browser, down from about 3.7 s. On a 10 Mbps line it is about 6 s, down from 16 s. A rough picture appears in under 1.5 s.
 - Terrain tiles are now saved in the browser (IndexedDB, up to 900 tiles), so after a reload, or when you change a setting, a new map takes about 0.6 s instead of downloading everything again.

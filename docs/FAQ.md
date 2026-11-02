@@ -50,4 +50,4 @@ They're in Tampermonkey's storage on that browser only, and aren't synced by Mes
 No. See [Privacy and data sources](Privacy-and-Data-Sources.md).
 
 **Why is the first coverage map in an area slower than the rest?**
-It has to download terrain first: about 60–80 tiles for 50 mi (around 8 MB). Since 1.1.1 you get a rough preview in about a second, and the tiles are saved in your browser. After that, reloads and setting changes take well under a second. **Clear saved results** also clears this saved terrain.
+It has to download terrain first: about 60–80 tiles for 50 mi (around 8 MB). Since 1.1.1 you get a rough preview in about a second, and the tiles are saved in your browser. After that, reloads and setting changes take well under a second. **Clear saved results** also clears this saved terrain. Since 1.1.2 the working-out runs in a background worker, so Chrome + Tampermonkey is as quick as other browsers (about 2–3 s for a fresh 50 mi map on broadband).

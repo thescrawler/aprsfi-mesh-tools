@@ -42,6 +42,7 @@ There are more nodes in view than *Most nodes to draw* allows, so the ones neare
 
 ## Coverage is very slow
 
+- Update to **1.1.2-beta** or newer. Older versions could take a minute or more per map in Chrome with Tampermonkey (see the [Changelog](Changelog.md)). A 50 mi map should now take a few seconds the first time and be near-instant after that.
 - Use **Terrain detail: Fast** or **Balanced**, and a smaller **Farthest distance**.
 - Turn off **Show ALL nearby repeaters**.
 - Use **Smoothness 180** and turn off **Strict mode**.
