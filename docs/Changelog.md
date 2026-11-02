@@ -1,5 +1,13 @@
 # 📝 Changelog
 
+## Nov 2, 2026: 1.2.0-beta
+- **More realistic Signal strength maps for low antennas on flat ground.** Over open, flat land, part of the signal bounces off the ground and partly cancels itself out, so a short mast doesn't reach as far as the old map suggested. The ground-bounce loss now blends in smoothly with distance, and antenna heights are measured above the ground along each path, so hilltop and mountain sites (like Pine Observatory) still get credit for their height. Hills still block as before.
+- **New setting: Fade margin (dB)** under Advanced, default **10**. It's a safety cushion: the map only counts a spot as covered if the signal is this much stronger than the bare minimum, because real signals come and go. Lower = more area but more dropouts, higher = only dependable spots. See *Fade margin (dB)* on the [Coverage](Coverage.md) page.
+- Example, pin at 45.79556, -119.41658 (ground 607 ft, 50 ft antenna, your radio at about 6.6 ft), 50 mi: usable area **27.2% → 18.0%**, unbroken strong coverage from the pin **21.6 mi → 13.4 mi** at most (median 6.7 → 5.2 mi). Distant hillsides that face the pin (for example the slopes south of Prosser) can still show up, because they have a clear view.
+- Pine Observatory (10 ft mast, 50 mi): usable area **35.2% → 21.4%**. Almost all of that change is the new 10 dB fade margin. With Fade margin set to 0 it's 36.6%, so mountain sites aren't penalized by the ground-bounce change.
+- Speed is unchanged. The maths still runs in the background Web Worker (Chrome bench, 50 mi pin: 2.1 s first load, 0.01 s after a reload).
+- Saved results from older versions are worked out again automatically.
+
 ## Nov 2, 2026: 1.1.3-beta
 - **Fix: repeater popups closing the first time.** Clicking a repeater opened its info box, but as soon as you moved the mouse up into it, it disappeared, and you had to click a second time. When a box opens near the edge of the map, the map slides over a little so the box fits. That slide made the script redraw the nodes, and the redraw removed the repeater you had just clicked, which closed its box. Now the redraw leaves the clicked node and its box alone, so one click is enough.
 

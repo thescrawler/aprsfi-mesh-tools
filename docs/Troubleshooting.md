@@ -57,6 +57,7 @@ The chosen Terrain detail would need more than 480 terrain tiles at this distanc
 - Check the **antenna heights**. A repeater on a tower needs its real height set in its popup.
 - Remember it's [bare earth only](Coverage.md#limitations): no trees or buildings.
 - Some repeater positions are approximate.
+- Map looks too hopeful, or too gloomy? Change **Fade margin (dB)** (Coverage, Advanced). Higher = more cautious map, lower = more area but more dropouts. 10 is the default.
 - Try **Clear saved results** (Coverage, Advanced) to recompute from scratch.
 - "No hill/terrain data for that spot" means the terrain service had no height there (rare, mostly at sea).
 

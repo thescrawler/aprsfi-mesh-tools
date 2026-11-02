@@ -98,6 +98,17 @@ Default **22 dBm** (the usual MeshCore repeater setting). Choices: 14, 17, 20, 2
 ### ♻️ Antenna gain (each)
 Default **3 dBi**, applied to both the repeater and your radio. Choices: 0, 2, 3, 5, 6, 8 dBi. Only used by *Signal strength*.
 
+### ♻️ Fade margin (dB)
+*New in 1.2.0.* Default **10**. Choices: 0, 5, 10, 15, 20. Only used by *Signal strength*.
+
+Think of it as a **safety cushion**. Radio signals don't stay perfectly steady: they rise and fall as people walk by, trucks pass, leaves move, the weather changes, or you hold the radio differently. A spot that only *just* gets a signal on paper will often drop out in real life. The fade margin asks the map to keep this many dB in reserve before it calls a spot covered.
+
+- **10 (default):** a good everyday choice. Shaded areas should work most of the time.
+- **0:** shows the most area, but the edges are "on a good day" only. Expect dropouts there.
+- **15 or 20:** shows only very dependable spots. Good if you're planning where to put a repeater and want to be sure.
+
+Every 3 dB is roughly half or double the signal power, so 10 dB is about a tenth of the power held back as a cushion.
+
 ### ♻️ Smoothness
 **180** or **360 (default)** directions (rays) are checked around each repeater, i.e. one every 2° or every 1°. More rays give smoother edges, but take longer to compute.
 
@@ -128,10 +139,11 @@ Results are saved (in Tampermonkey's storage) for the **60 most recently compute
 
 Steps 1 to 4 are the same. Then, every few hundred metres along each ray, the script works out how much signal would be left:
 
-- **Distance loss:** the worse of free-space loss at the node's frequency and "plane-earth" loss (ground reflection, which matters for low antennas over flat ground). Antenna heights for that part are measured above the average ground along the path, so a mountain-top repeater gets credit for its height.
-- **Hill loss:** **Deygout knife-edge diffraction** over up to **3 ridges** (the worst ridge, then the worst one on each side of it). Signals can bend over a ridge and lose some strength, instead of stopping dead.
+- **Distance loss:** free-space loss at the node's frequency, plus **ground reflection** (improved in 1.2.0). Over open ground, part of the signal bounces off the ground and partly cancels the direct signal. For low antennas this makes the signal fall off much faster with distance (the "two-ray" or plane-earth model, `40·log10(d) − 20·log10(ht·hr)`). Close in it makes no difference. It starts to matter past the *breakpoint* distance `4·ht·hr/λ` and blends in smoothly (3 dB extra at π times the breakpoint), until it equals plane-earth loss far out. **ht** and **hr** are the antenna heights above a straight line fitted through the ground along that path, never less than the real mast heights. So a repeater on a mountain top looking down over a basin gets full credit for its height, while a short mast on flat ground doesn't.
+- **Hill loss:** **Deygout knife-edge diffraction** over up to **3 ridges** (the worst ridge, then the worst one on each side of it). Signals can bend over a ridge and lose some strength, instead of stopping dead. This is added on top of the ground-reflection loss, so hills still block. The first 6 dB of "just grazing the ground" loss, which both models describe, is only counted once.
 - **Link budget:** repeater power (default 22 dBm) + antenna gain at both ends (default 3 dBi each) - losses, compared with the receiver's **sensitivity**. Sensitivity is worked out from the node's own **spreading factor (SF)** and **bandwidth** when it reports them on map.meshcore.io: `-174 + 10·log10(BW in Hz) + 6 dB noise figure + the SNR that SF needs`. Otherwise it uses the MeshCore US default of 910.525 MHz, SF7, 62.5 kHz (about **-127.5 dBm**).
-- **Shading:** at least **10 dB** to spare = **strong** (solid). **0 to 10 dB** to spare = **weak** (light). Less = not shaded.
+- **Fade margin:** the *Fade margin* setting (default 10 dB) is taken off what's left, as a safety cushion.
+- **Shading:** after the fade margin, at least **10 dB** to spare = **strong** (solid). **0 to 10 dB** to spare = **weak** (light). Less = not shaded.
 
 Ground within 100 m of the antenna never counts as a ridge, in either mode.
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         aprs.fi Mesh Tools (beta)
 // @namespace    https://greasyfork.org/users/aprsfi-mesh-overlay
-// @version      1.1.3-beta
+// @version      1.2.0-beta
 // @description  One easy panel for aprs.fi: see MeshCore & Meshtastic radios on the map, check roughly where a repeater can reach, and hide map clutter. Bundles Mesh Overlay, Mesh Coverage and Map Layer Toggles.
 // @author       aprsfi-mesh-overlay contributors
 // @license      MIT
@@ -49,7 +49,7 @@
   const { Math, isFinite, Float32Array, Float64Array, Uint8Array, Uint16Array, Int16Array, Array, Map, Set, Promise, Object, Date, Number, JSON, Error } = globalThis;
   const performance = globalThis.performance || { now: () => Date.now() };
   const W = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : (typeof window !== 'undefined' ? window : globalThis);
-  const VERSION = '1.1.3-beta';
+  const VERSION = '1.2.0-beta';
   const TAG = '[mesh-tools]';
   const WIKI_URL = 'https://github.com/thescrawler/aprsfi-mesh-tools/blob/main/docs/Home.md'; // 📖 Help / Wiki link in Panel settings
 
@@ -146,7 +146,7 @@
   const LORA_SNR = { 5: -2.5, 6: -5, 7: -7.5, 8: -10, 9: -12.5, 10: -15, 11: -17.5, 12: -20 }; // demod floor per SF (Semtech)
   const RADIO_DEF = { freq: 910.525, sf: 7, bw: 62.5 }; // MeshCore US default
   const LINK_DEF = { txDbm: 22, gainDbi: 3, nfDb: 6 };
-  const MARGIN_STRONG = 10, MARGIN_MARGINAL = 0;
+  const MARGIN_STRONG = 10, MARGIN_MARGINAL = 0, FADE_DEF = 10; // fade margin (dB) subtracted before the strong/weak test
   // receiver sensitivity (dBm) = thermal noise -174 dBm/Hz + 10log10(BW) + noise figure + required SNR for the SF
   function loraSens(sf, bwKHz, nf) {
     sf = Math.round(+sf); if (!(sf in LORA_SNR)) sf = RADIO_DEF.sf; bwKHz = +bwKHz > 0 ? +bwKHz : RADIO_DEF.bw;
@@ -154,6 +154,16 @@
   }
   const fsplDb = (dM, fMHz) => 20 * Math.log10(dM / 1000) + 20 * Math.log10(fMHz) + 32.44;
   const planeEarthDb = (dM, ht, hr) => 40 * Math.log10(dM) - 20 * Math.log10(ht * hr);
+  // 1.2.0 ground reflection: extra loss over free space from the 2-ray (plane-earth) model. Effective heights are above
+  // the path's own ground: the higher of a least-squares line through the profile and the profile mean, never below the
+  // real masts (so a mountain top over a basin keeps its height). Smooth knee: ~0 dB up to the breakpoint 4*ht*hr/lambda,
+  // 3 dB at the crossover pi*breakpoint, then exactly plane-earth minus free space (40log d - 20log(ht*hr) beyond).
+  function groundExcessDb(d, cnt, sx, sy, sxx, sxy, h0, hr, txAgl, rxAgl, lambda) {
+    const mean = sy / cnt, den = cnt * sxx - sx * sx, b = den > 0 ? (cnt * sxy - sx * sy) / den : 0, a = mean - b * sx / cnt;
+    const ht = Math.max(txAgl, h0 - a), he = Math.max(rxAgl, hr - (a + b * d));
+    const dc = 4 * Math.PI * ht * he / lambda, r = d / dc;
+    return 10 * Math.log10(1 + r * r);
+  }
   const knifeJ = v => (v <= -0.78 ? 0 : 6.9 + 20 * Math.log10(Math.sqrt((v - 0.1) * (v - 0.1) + 1) + v - 0.1)); // ITU-R P.526
   // highest-v edge strictly between sample a and b (heights already include earth bulge); ha/hb = end heights ASL
   function bestEdge(dist, elev, a, b, ha, hb, lambda, near) {
@@ -174,7 +184,7 @@
     const [, vl] = bestEdge(dist, elev, 0, m, h0, hm, lambda, near), [, vr] = bestEdge(dist, elev, m, i, hm, hr, lambda, near);
     return knifeJ(vm) + (vl > -0.78 ? knifeJ(vl) : 0) + (vr > -0.78 ? knifeJ(vr) : 0);
   }
-  // o: { range, step, rx, freqMHz, txDbm, gainDbi, sensDbm, near? } -> Uint16Array [start, end, level, ...] level 2 strong / 1 marginal
+  // o: { range, step, rx, freqMHz, txDbm, gainDbi, sensDbm, fadeDb?, near? } -> Uint16Array [start, end, level, ...] level 2 strong / 1 marginal
   function computeRaySignal(getElev, lat, lon, brg, o, h0) {
     const n = Math.floor(o.range / o.step), elev = new Float32Array(n + 1), dist = new Float32Array(n + 1);
     const near = o.near != null ? o.near : NEAR_M, lambda = 299792458 / (o.freqMHz * 1e6);
@@ -184,18 +194,20 @@
       let e = getElev(p[0], p[1]); if (!isFinite(e)) e = 0;
       dist[i] = d; elev[i] = e - d * d / (2 * K_FACTOR * R_EARTH);
     }
-    // running sum of path ground, for effective antenna heights in the 2-ray (plane-earth) term
-    const cum = new Float64Array(n + 1); for (let i = 1; i <= n; i++) cum[i] = cum[i - 1] + elev[i];
+    // running sums of path ground (x = distance, y = ground) for the fitted line used by the 2-ray heights
+    let sx = 0, sy = 0, sxx = 0, sxy = 0;
+    const acc = j => { const x = dist[j], y = elev[j]; sx += x; sy += y; sxx += x * x; sxy += x * y; };
+    acc(0); let done = 0;
     // evaluate the receiver every `stride` samples (<= ~300 points/ray keeps Deygout O(n) scans cheap), fill between
-    const stride = Math.max(1, Math.ceil(n / 300)), budget = o.txDbm + 2 * o.gainDbi - o.sensDbm;
+    const stride = Math.max(1, Math.ceil(n / 300)), budget = o.txDbm + 2 * o.gainDbi - o.sensDbm - (o.fadeDb || 0);
     const lvl = new Uint8Array(n + 1);
     for (let i = stride; i <= n + stride - 1; i += stride) {
       const k = Math.min(i, n), hr = elev[k] + o.rx;
-      // basic loss = worse of free space and plane-earth (ground reflection, matters for low antennas on flat ground);
-      // effective heights are above the path's mean ground, never less than the real mast heights
-      const mean = cum[k] / k, ht = Math.max(o.txAgl || 1, h0 - mean), hrE = Math.max(o.rx, hr - mean);
-      const basic = Math.max(fsplDb(dist[k], o.freqMHz), planeEarthDb(dist[k], ht, hrE));
-      const margin = budget - basic - deygoutDb(dist, elev, k, h0, hr, lambda, near);
+      while (done < k) acc(++done);
+      const m = groundExcessDb(dist[k], k + 1, sx, sy, sxx, sxy, h0, hr, o.txAgl || 1, o.rx, lambda);
+      const dif = deygoutDb(dist, elev, k, h0, hr, lambda, near);
+      // diffraction (terrain blocking) is added on top; the grazing part both models share (up to 6 dB) is counted once
+      const margin = budget - fsplDb(dist[k], o.freqMHz) - m - dif + Math.min(m, dif, 6);
       const L = margin >= MARGIN_STRONG ? 2 : margin >= MARGIN_MARGINAL ? 1 : 0;
       for (let j = Math.max(1, k - stride + 1); j <= k; j++) lvl[j] = L;
       if (k === n) break;
@@ -209,7 +221,7 @@
   // ===== /LOSCORE =====
 
   if (typeof module !== 'undefined' && typeof GM_xmlhttpRequest === 'undefined') {
-    module.exports = { computeRay, lonLatToTilePx, destPoint, TILE_Z, DETAIL, TILE_CAP, NEAR_M, tileUrl, computeRaySignal, loraSens, fsplDb, planeEarthDb, knifeJ, deygoutDb, LORA_SNR, RADIO_DEF, LINK_DEF, MARGIN_STRONG, MARGIN_MARGINAL, tileRange, effZoom, stepForZ, tileUrl2, tilesInCircle, PREVIEW, previewZ, fineRadius, tilePlan }; return;
+    module.exports = { computeRay, lonLatToTilePx, destPoint, TILE_Z, DETAIL, TILE_CAP, NEAR_M, tileUrl, computeRaySignal, loraSens, fsplDb, planeEarthDb, groundExcessDb, knifeJ, deygoutDb, LORA_SNR, RADIO_DEF, LINK_DEF, MARGIN_STRONG, MARGIN_MARGINAL, FADE_DEF, tileRange, effZoom, stepForZ, tileUrl2, tilesInCircle, PREVIEW, previewZ, fineRadius, tilePlan }; return;
   }
   if (W.__meshToolsActive) return; // installed twice
   W.__meshToolsActive = VERSION;
@@ -469,7 +481,7 @@
   // MODULE 2: Coverage (from aprsfi-mesh-coverage 0.4.0)
   // =====================================================================
   const COVERAGE = (function () {
-    const OPTS = { age: [7, 30, 90], tx: [1, 3, 6, 10, 15, 25], rx: [1, 2, 5, 10], rays: [180, 360], txp: [14, 17, 20, 22, 27, 30], gain: [0, 2, 3, 5, 6, 8] };
+    const OPTS = { age: [7, 30, 90], tx: [1, 3, 6, 10, 15, 25], rx: [1, 2, 5, 10], rays: [180, 360], txp: [14, 17, 20, 22, 27, 30], fade: [0, 5, 10, 15, 20], gain: [0, 2, 3, 5, 6, 8] };
     // ---------- antenna heights: stored in METRES, shown/typed in the user's unit (ft or m) ----------
     const H_MIN_M = 0.3, H_MAX_M = 100, M_PER_FT = 0.3048;
     const validM = (v, d) => (isFinite(+v) && +v >= H_MIN_M && +v <= H_MAX_M ? +v : d);
@@ -535,6 +547,7 @@
       rays: pick(GM_getValue('cv_rays', 360), OPTS.rays, 360), fresnel: GM_getValue('cv_fresnel', false),
       mode: GM_getValue('cv_mode', 'signal') === 'los' ? 'los' : 'signal',
       txp: pick(GM_getValue('cv_txp', LINK_DEF.txDbm), OPTS.txp, LINK_DEF.txDbm), gain: pick(GM_getValue('cv_gain', LINK_DEF.gainDbi), OPTS.gain, LINK_DEF.gainDbi),
+      fade: pick(GM_getValue('cv_fade', FADE_DEF), OPTS.fade, FADE_DEF),
       enabled: GM_getValue('cv_enabled', true), allRep: GM_getValue('cv_all', false),
       detail: DETAIL[GM_getValue('cv_detail', 'balanced')] ? GM_getValue('cv_detail', 'balanced') : 'balanced'
     };
@@ -545,12 +558,12 @@
     const PALETTE = [[30, 136, 229], [67, 160, 71], [216, 27, 96], [0, 172, 193], [94, 53, 177], [192, 202, 51], [109, 76, 65], [84, 110, 122]];
     const rgb = c => `rgb(${c.join(',')})`;
     const MARK_MAX = 400;
-    const settingsKey = () => [S.mode, S.txp, S.gain, S.tx, S.rx, S.range, S.rays, S.fresnel ? 1 : 0, S.detail].join('_');
+    const settingsKey = () => [S.mode, S.txp, S.gain, S.fade, S.tx, S.rx, S.range, S.rays, S.fresnel ? 1 : 0, S.detail].join('_');
     // the node's own radio settings when it reported them, else the MeshCore US default
     const siteRadio = s => { const r = Array.isArray(s.radio) ? s.radio : []; return [r[0] || RADIO_DEF.freq, LORA_SNR[r[1]] != null ? r[1] : RADIO_DEF.sf, r[2] > 0 ? r[2] : RADIO_DEF.bw]; };
     const siteZ = s => effZoom(S.detail, s.lat, s.lon, s.range * 1000);
     // per-site key: pins may override tx height / range, so the key uses the site's effective values
-    const modeKey = s => S.mode === 'los' ? 'los' : ['sig', S.txp, S.gain].concat(siteRadio(s)).join('~');
+    const modeKey = s => S.mode === 'los' ? 'los' : ['sig2', S.txp, S.gain, S.fade].concat(siteRadio(s)).join('~');
     const siteKey = s => s.id + '@' + ['r2', modeKey(s), s.tx, S.rx, s.range, S.rays, S.fresnel ? 1 : 0, stepForZ(siteZ(s))].join('_');
 
     const st = { map: null, L: null, nodes: null, loading: false, err: '', layers: {}, timer: null,
@@ -711,7 +724,7 @@
     // the worker is built from the LOSCORE function sources, so there is one copy of the maths
     const WORKER_SRC = () => [
       `const R_EARTH=${R_EARTH},K_FACTOR=${K_FACTOR},NEAR_M=${NEAR_M},MARGIN_STRONG=${MARGIN_STRONG},MARGIN_MARGINAL=${MARGIN_MARGINAL};`,
-      lonLatToTilePx, destPoint, computeRay, bestEdge, deygoutDb, computeRaySignal, elevFrom,
+      lonLatToTilePx, destPoint, computeRay, bestEdge, deygoutDb, groundExcessDb, computeRaySignal, elevFrom,
       'const fsplDb=' + fsplDb, 'const planeEarthDb=' + planeEarthDb, 'const knifeJ=' + knifeJ,
       `onmessage=e=>{const m=e.data,got=new Map(m.got),getElev=elevFrom(got,m.z,m.lat,m.lon,m.rin),ray=m.sig?computeRaySignal:computeRay,segs=[];
         let t0=Date.now();for(let i=0;i<m.rays;i++){segs.push(ray(getElev,m.lat,m.lon,i/m.rays*2*Math.PI,m.o,m.h0));
@@ -740,7 +753,7 @@
       site.g = g;
       const [fMHz, sf, bw] = siteRadio(site), sig = S.mode !== 'los';
       const o = { range: site.range * 1000, step, rx: S.rx, fresnel: S.fresnel, freqMHz: sig ? fMHz : 915, txAgl: site.tx,
-        txDbm: S.txp, gainDbi: S.gain, sensDbm: loraSens(sf, bw) };
+        txDbm: S.txp, gainDbi: S.gain, sensDbm: loraSens(sf, bw), fadeDb: S.fade };
       const h0 = g + site.tx; // antenna ASL = sampled ground (nearest terrarium px) + AGL height
       let segs = null;
       if (!wkBroken) {
@@ -1103,6 +1116,7 @@
           ${sel('cv-rays', 'Smoothness', 'More = smoother but slower', OPTS.rays, S.rays, '')}
           ${sel('cv-txp', 'Repeater power', 'Transmit power used for Signal strength', OPTS.txp, S.txp, ' dBm')}
           ${sel('cv-gain', 'Antenna gain (each)', 'Antenna gain at both ends, for Signal strength', OPTS.gain, S.gain, ' dBi')}
+          ${sel('cv-fade', 'Fade margin (dB)', 'Safety cushion: higher = more cautious map', OPTS.fade, S.fade, '')}
           <label title="Stricter check that leaves extra clearance over hills (915 MHz)"><input type="checkbox" id="cv-fr"><span>Strict mode (Fresnel 60%)<small>(Clear view only)</small></span></label>
           <button type="button" id="cv-clr">Clear saved results</button>
         </details>
@@ -1112,7 +1126,7 @@
       const cb = (id, key, gk, recompute) => { const e = $id(id); e.checked = S[key]; e.addEventListener('change', () => { S[key] = e.checked; GM_setValue(gk, e.checked); if (!state.active) return; recompute ? settingsChanged() : refresh(); }); };
       cb('cv-en', 'enabled', 'cv_enabled'); cb('cv-rep', 'showRep', 'cv_rep'); cb('cv-room', 'showRoom', 'cv_room'); cb('cv-all', 'allRep', 'cv_all'); cb('cv-fr', 'fresnel', 'cv_fresnel', true);
       const sl = (id, key, opts, recompute) => $id(id).addEventListener('change', e => { S[key] = pick(e.target.value, opts, S[key]); GM_setValue('cv_' + key, S[key]); if (!state.active) return; recompute ? settingsChanged() : refresh(); });
-      sl('cv-age', 'age', OPTS.age); sl('cv-rays', 'rays', OPTS.rays, 1); sl('cv-txp', 'txp', OPTS.txp, 1); sl('cv-gain', 'gain', OPTS.gain, 1);
+      sl('cv-age', 'age', OPTS.age); sl('cv-rays', 'rays', OPTS.rays, 1); sl('cv-txp', 'txp', OPTS.txp, 1); sl('cv-gain', 'gain', OPTS.gain, 1); sl('cv-fade', 'fade', OPTS.fade, 1);
       const leg = () => { const e = $id('cv-legend'); if (e) e.innerHTML = S.mode === 'los' ? 'Shaded = clear view of the repeater over the hills.' : '<b>Solid</b> = strong signal · <b>light</b> = weak, may work · none = unlikely'; };
       leg(); $id('cv-mode').addEventListener('change', e => { S.mode = e.target.value === 'los' ? 'los' : 'signal'; GM_setValue('cv_mode', S.mode); leg(); if (state.active) settingsChanged(); });
       $id('cv-pin').addEventListener('click', () => { if (!state.active) return; st.pinMode = !st.pinMode; updPinBtn(); idleStatus(Object.keys(st.layers).length); });
@@ -1527,6 +1541,7 @@
     'cv-mode': 'Signal strength (recommended) estimates how strong the repeater would be, including signal bending over hills. Solid shading is strong, light shading is weak but may work. Clear view only shades places with a straight, unblocked line to the repeater (the older, stricter method).',
     'cv-txp': 'How much power the repeater transmits. Most MeshCore repeaters use 22 dBm. Only used for Signal strength.',
     'cv-gain': 'Antenna gain, used for both the repeater and your radio. A typical small antenna is about 3 dBi. Only used for Signal strength.',
+    'cv-fade': 'A safety cushion. Real signals come and go (people, trucks, weather, a hand on the radio), so the map only counts a spot as covered if the signal is this much stronger than the bare minimum. 10 is a good everyday choice. Lower shows more area but expect dropouts; higher shows only very dependable spots. Only used for Signal strength.',
     'cv-fr': 'Requires extra clearance above hills (Fresnel zone). More realistic, shows less coverage.',
     'cv-clr': 'Deletes saved coverage results so they are worked out again from scratch.',
     'mt-wiki': 'Opens the full Mesh Tools help pages in a new tab: install steps, every setting explained, and fixes for common problems.',
