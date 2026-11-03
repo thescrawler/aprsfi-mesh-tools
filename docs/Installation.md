@@ -16,6 +16,8 @@ https://raw.githubusercontent.com/thescrawler/aprsfi-mesh-tools/main/aprsfi-mesh
 
 On a computer you can also click the one-click link in [Step 2](#step-2-install-the-mesh-tools-script). Edge, Kiwi, and iPhone are below.
 
+**New here?** Read [What is Tampermonkey](What-is-Tampermonkey.md) first. It says what the add-on is, then how to find the panel after it is installed.
+
 Mesh Tools is a **userscript**: a small program that a browser extension runs on certain web pages. You need two things:
 
 1. A userscript manager extension. We recommend **Tampermonkey**.

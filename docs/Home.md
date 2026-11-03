@@ -1,5 +1,7 @@
 # aprs.fi Mesh Tools
 
+**New here?** Start with [What is Tampermonkey](What-is-Tampermonkey.md). It explains the add-on in plain language, then how to find the panel and use each tab.
+
 ## 📲 Install (easiest way, works on phones)
 Firefox on Android is the usual way. Copy this link, open Tampermonkey's **Utilities** page, then use **Import from URL**.
 
@@ -30,7 +32,7 @@ Current version: **1.4.0-beta**. It runs in your web browser through the free **
 
 ## Quick links
 
-- 🚀 **New here?** Start with [Installation](Installation.md).
+- 🚀 **New here?** Start with [What is Tampermonkey](What-is-Tampermonkey.md), then [Installation](Installation.md).
 - 📡 [Mesh nodes tab](Mesh-Nodes.md)
 - 📶 [Coverage tab](Coverage.md), including every setting and how the estimate works
 - 🗺️ [Map layers tab](Map-Layers.md)

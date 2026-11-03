@@ -1,6 +1,7 @@
 **[🏠 Home](Home.md)**
 
 **Getting started**
+- [What is Tampermonkey?](What-is-Tampermonkey.md)
 - [🚀 Installation](Installation.md)
 
 **Using it**

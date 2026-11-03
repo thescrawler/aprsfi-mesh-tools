@@ -16,6 +16,8 @@ https://raw.githubusercontent.com/thescrawler/aprsfi-mesh-tools/main/aprsfi-mesh
 
 On a computer you can also click the one-click link below. Edge, Kiwi, and iPhone are a little different: [phone steps](docs/Installation.md#installing-on-a-phone).
 
+**New here?** [What is Tampermonkey?](docs/What-is-Tampermonkey.md) explains the free browser add-on, then how to open aprs.fi and use the panel.
+
 A Tampermonkey userscript that adds **MeshCore and Meshtastic nodes**, **terrain-based coverage estimates** and **map layer toggles** to [aprs.fi](https://aprs.fi), all in one touch-friendly panel.
 
 <img src="docs/img/phone-coverage.png" alt="Mesh Tools coverage panel on a phone" width="320">
@@ -48,6 +50,8 @@ https://raw.githubusercontent.com/thescrawler/aprsfi-mesh-tools/main/aprsfi-mesh
 Tampermonkey keeps it updated automatically from this repository. A Greasy Fork listing is coming later.
 
 ## Documentation
+
+📖 **[What is Tampermonkey?](docs/What-is-Tampermonkey.md)** if you have not used it before.
 
 📖 **[User guide](docs/Home.md)**: installation, every setting, how coverage is estimated, troubleshooting and FAQ.
 
