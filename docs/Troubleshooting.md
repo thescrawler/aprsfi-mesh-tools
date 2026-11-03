@@ -11,13 +11,19 @@
 
 ## On my phone, the install link just shows code
 
-You're in a browser without Tampermonkey. Chrome on a phone can't run extensions. On Android, use Firefox or Edge with Tampermonkey; on iPhone/iPad, use Safari with the Tampermonkey app turned on. Then open the install link in that browser. If it still only shows code, open Tampermonkey's menu, choose **Utilities**, then **Import from URL**, and paste this link:
+You're in a browser without Tampermonkey. Chrome on a phone can't run extensions. On Android, use Firefox or Edge with Tampermonkey; on iPhone/iPad, use Safari with the Tampermonkey app turned on. If the link still only shows code, install it from Tampermonkey's Utilities page:
+
+1. Long-press this link and choose **Copy link**.
 
 ```
 https://raw.githubusercontent.com/thescrawler/aprsfi-mesh-tools/main/aprsfi-mesh-tools.user.js
 ```
 
-Tap **Install**. See [Installing on a phone](Installation.md#installing-on-a-phone).
+2. Open the **Dashboard**. In Firefox that is usually the **⋮** menu, then **Extensions** (or **Add-ons**), then **Tampermonkey**. Or tap the Tampermonkey icon, then **Dashboard**.
+3. Tap the **Utilities** tab at the top. Slide the tab row sideways if you don't see it.
+4. Under **Import from URL**, paste the link, tap **Install**, then tap **Install** again.
+
+The same idea works in Edge and in Safari. See [Installing on a phone](Installation.md#installing-on-a-phone).
 
 ## "⚠ Old scripts are still on" / a tab says it's turned off
 

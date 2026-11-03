@@ -1,5 +1,8 @@
 # 📝 Changelog
 
+## Nov 3, 2026: docs
+- Phone install: step-by-step way to open Tampermonkey's Utilities tab before Import from URL. Firefox for Android is spelled out (menu, Extensions, Dashboard, slide to Utilities). Edge, Kiwi, and iPhone Safari are included briefly.
+
 ## Nov 3, 2026: 1.4.0-beta
 - **Show or hide each kind of MeshCore radio.** Under **Show MeshCore nodes**: Repeaters (red ◆R), Companions (blue ◆C, the chat nodes), Room servers (purple ◆S), Sensors (teal ◆s), and Other / unknown (grey ◆?). Each row uses the same diamond as the map, and the ⓘ button explains it. The master switch still hides everything, including the plain coverage dots. Turning off Repeaters or Room servers hides those dots too. The choice is remembered, and it does not download the node list again.
 

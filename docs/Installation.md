@@ -1,13 +1,20 @@
 # Installation
 
 ## 📲 Install (easiest way, works on phones)
-In Tampermonkey, open the menu, choose **Utilities**, then **Import from URL**, and paste this link:
+Firefox on Android is the usual way. Copy this link, open Tampermonkey's **Utilities** page, then use **Import from URL**.
 
 ```
 https://raw.githubusercontent.com/thescrawler/aprsfi-mesh-tools/main/aprsfi-mesh-tools.user.js
 ```
 
-Tap **Install**. (On a computer you can also just click the one-click install link below.)
+1. Long-press the link and choose **Copy link** (or copy it from the box).
+2. In Firefox, tap the menu (the three dots), then **Extensions**. Older Firefox says **Add-ons**. Tap **Tampermonkey**. If you already see a Tampermonkey icon, tap that instead.
+3. Tap **Dashboard**.
+4. At the top of the Dashboard, tap the **Utilities** tab. On a small screen those tabs sit in a row you can slide sideways until **Utilities** shows. Tampermonkey's own help says: if that tab is missing, set **Config mode** to **Beginner** or **Advanced**.
+5. Find **Import from URL**, paste the link, and tap **Install**.
+6. Tap **Install** again on the next page.
+
+On a computer you can also click the one-click link in [Step 2](#step-2-install-the-mesh-tools-script). Edge, Kiwi, and iPhone are below.
 
 Mesh Tools is a **userscript**: a small program that a browser extension runs on certain web pages. You need two things:
 
@@ -74,7 +81,7 @@ Chrome on a phone **can't run extensions**, so Tampermonkey won't work there. Us
 1. Install **Firefox** or **Microsoft Edge** from the Google Play Store. (Kiwi Browser also works, but Tampermonkey says it is no longer updated, so Firefox or Edge is safer.)
 2. In that browser, add **Tampermonkey**: in Firefox tap **⋮**, then **Extensions**, and search for Tampermonkey. In Edge tap **☰**, then **Extensions**, and add Tampermonkey.
 
-Then install Mesh Tools with **Import from URL**. This is the reliable way on a phone, including when a link only shows code:
+Then install Mesh Tools with **Import from URL**. This is the reliable way on a phone, including when a link only shows code. First you have to open Tampermonkey's **Utilities** page. Menus vary a little, so the names below are the usual ones.
 
 1. Long-press the link below and choose **Copy link** (or copy it from the box).
 
@@ -82,17 +89,20 @@ Then install Mesh Tools with **Import from URL**. This is the reliable way on a 
 https://raw.githubusercontent.com/thescrawler/aprsfi-mesh-tools/main/aprsfi-mesh-tools.user.js
 ```
 
-2. Tap the Tampermonkey icon in the browser menu, then **Dashboard**. Menus vary a little. In Firefox it is usually the **⋮** menu, then **Extensions** or **Add-ons**, then **Tampermonkey**. In Edge it is usually the **⋮** menu, then **Extensions**, then **Tampermonkey**.
-3. Open **Utilities**.
-4. Under **Import from URL**, paste the link and tap **Install**.
-5. Tap **Install** again on the next screen, then open <https://aprs.fi>.
+2. Open the **Dashboard**.
+   - **Firefox:** tap the **⋮** menu, then **Extensions** (older Firefox says **Add-ons**), then **Tampermonkey**. Or tap the Tampermonkey icon and choose **Dashboard**.
+   - **Edge:** usually the **⋮** menu, then **Extensions**, then **Tampermonkey**, then **Dashboard**.
+   - **Kiwi:** usually the same path as Edge. Tampermonkey lists Kiwi only for an old version and says it is no longer updated, so Firefox or Edge is safer.
+3. At the top of the Dashboard, tap the **Utilities** tab. On a small screen the tabs are in a row you slide sideways. Keep sliding until **Utilities** appears. Tampermonkey's help says that if the tab is hidden, set **Config mode** to **Beginner** or **Advanced**.
+4. On that page, find **Import from URL**. Paste the link and tap **Install**.
+5. Tap **Install** again on the confirm page, then open <https://aprs.fi>.
 
 ### iPhone / iPad
 
 1. Install the **Tampermonkey** app from the App Store.
 2. Open **Settings**, then **Safari**, then **Extensions** (on newer iOS: **Settings**, **Apps**, **Safari**, **Extensions**). Turn on **Tampermonkey** and set it to **Allow** on **All Websites**.
 
-Then install Mesh Tools with **Import from URL**. This is the reliable way on a phone, including when a link only shows code:
+Then install Mesh Tools with **Import from URL**. Tampermonkey's iPhone app is a Safari extension. These steps are for that. Another browser only works if it can run the same extension. Bluefy, for example, is a Bluetooth browser and does not have Tampermonkey's Dashboard.
 
 1. Long-press the link below and choose **Copy link** (or copy it from the box).
 
@@ -100,10 +110,10 @@ Then install Mesh Tools with **Import from URL**. This is the reliable way on a 
 https://raw.githubusercontent.com/thescrawler/aprsfi-mesh-tools/main/aprsfi-mesh-tools.user.js
 ```
 
-2. Tap the Tampermonkey icon in the browser menu, then **Dashboard**. In Safari this is usually the puzzle-piece or **aA** button, then **Tampermonkey**.
-3. Open **Utilities**.
-4. Under **Import from URL**, paste the link and tap **Install**.
-5. Tap **Install** again on the next screen, then open <https://aprs.fi>.
+2. In **Safari**, open Tampermonkey and tap **Dashboard**. This is usually the puzzle-piece or **aA** button, then **Tampermonkey**, then **Dashboard**.
+3. At the top of the Dashboard, tap the **Utilities** tab. On a small screen, slide that tab row sideways until **Utilities** shows. If the tab is missing, Tampermonkey's help says to set **Config mode** to **Beginner** or **Advanced**.
+4. Find **Import from URL**, paste the link, and tap **Install**.
+5. Tap **Install** again on the confirm page, then open <https://aprs.fi>.
 
 iPhone/iPad support is new and less tested. If something doesn't work, please tell us at <https://github.com/thescrawler/aprsfi-mesh-tools/issues>.
 

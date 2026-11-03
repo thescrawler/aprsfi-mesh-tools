@@ -1,13 +1,20 @@
 # aprs.fi Mesh Tools
 
 ## 📲 Install (easiest way, works on phones)
-In Tampermonkey, open the menu, choose **Utilities**, then **Import from URL**, and paste this link:
+Firefox on Android is the usual way. Copy this link, open Tampermonkey's **Utilities** page, then use **Import from URL**.
 
 ```
 https://raw.githubusercontent.com/thescrawler/aprsfi-mesh-tools/main/aprsfi-mesh-tools.user.js
 ```
 
-Tap **Install**. (On a computer you can also just click the one-click install link below.)
+1. Long-press the link and choose **Copy link** (or copy it from the box).
+2. In Firefox, tap the menu (the three dots), then **Extensions**. Older Firefox says **Add-ons**. Tap **Tampermonkey**. If you already see a Tampermonkey icon, tap that instead.
+3. Tap **Dashboard**.
+4. At the top of the Dashboard, tap the **Utilities** tab. On a small screen those tabs sit in a row you can slide sideways until **Utilities** shows. Tampermonkey's own help says: if that tab is missing, set **Config mode** to **Beginner** or **Advanced**.
+5. Find **Import from URL**, paste the link, and tap **Install**.
+6. Tap **Install** again on the next page.
+
+On a computer you can also use the one-click link in [Installation](Installation.md). Edge, Kiwi, and iPhone are a little different: [phone steps](Installation.md#installing-on-a-phone).
 
 **aprs.fi Mesh Tools** is a free add-on (a *userscript*) for the [aprs.fi](https://aprs.fi) map. It adds one small panel to the map with three tools:
 
