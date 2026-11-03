@@ -19,7 +19,10 @@ Only nodes that reach the internet through MQTT appear on meshmap.net, the sourc
 It must be listed on map.meshcore.io (it has to have advertised a position that reached the map). Also check the *heard* filter and that you're zoomed in to zoom 6 or closer.
 
 **How accurate is the coverage?**
-By default (**Signal strength**, since 1.1.0) it estimates signal level from distance, signal bending over hills and a typical LoRa link budget, then shades strong (solid) and weak (light) areas. It ignores trees and buildings. **Clear view only** is the older, stricter line-of-sight check. See [How the estimate works](Coverage.md#how-the-estimate-works).
+By default (**Signal strength**, since 1.1.0) it estimates signal level from distance, signal bending over hills and a typical LoRa link budget. It ignores trees and buildings. **Clear view only** is the older, stricter line-of-sight check. See [How the estimate works](Coverage.md#how-the-estimate-works).
+
+**What do the green, yellow, and orange colours mean?**
+They are signal-strength bands, after the fade-margin cushion (10 dB by default). **Green** means strong (at least 10 dB to spare). **Yellow** means fair (5 to 10 dB). **Orange** means weak but maybe usable (0 to 5 dB). No colour means unlikely. The same swatches are on the Coverage tab and in a small legend at the bottom-left of the map while coverage is showing. **Clear view only** does not use these colours. It shades one colour wherever there is a clear line over the hills.
 
 **Why did coverage grow a lot in 1.1.0?**
 The old check treated any hill in the way as a hard stop. Real signals bend over ridges and lose some strength. A high site like a mountain-top repeater now shows the basin below it as strong or weak coverage instead of patchy blobs. Switch **Map shows** to **Clear view only** for the old picture.

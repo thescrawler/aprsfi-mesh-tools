@@ -86,7 +86,7 @@ Tap a diamond or dot for its name, when it was last heard, and where it is. On a
 Open **📶 Coverage**. This shades the map with a **guess** from the shape of the hills. It does not know about trees or buildings. Do not treat the colour as a promise.
 
 1. Zoom in a bit more (about county level).
-2. Tap a red **◆R** repeater, then **Show coverage**. A shaded area appears after a short wait. Solid colour means a stronger guess, light colour means weaker.
+2. Tap a red **◆R** repeater, then **Show coverage**. A shaded area appears after a short wait. **Green** is a strong guess, **yellow** is fair, and **orange** is weak. The same colours are listed on the Coverage tab and in a small legend at the bottom-left of the map.
 3. Or tap **📍 Drop a pin to test a spot**, then tap the map, to try a place with no repeater.
 4. **Coverage on** turns this whole tab off without uninstalling anything. Pins you already dropped can still show.
 

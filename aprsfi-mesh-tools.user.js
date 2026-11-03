@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         aprs.fi Mesh Tools (beta)
 // @namespace    https://greasyfork.org/users/aprsfi-mesh-overlay
-// @version      1.4.0-beta
+// @version      1.5.0-beta
 // @description  One easy panel for aprs.fi: see MeshCore & Meshtastic radios on the map, check roughly where a repeater can reach, and hide map clutter. Bundles Mesh Overlay, Mesh Coverage and Map Layer Toggles.
 // @author       aprsfi-mesh-overlay contributors
 // @license      MIT
@@ -50,7 +50,7 @@
   const performance = globalThis.performance || { now: () => Date.now() };
   const BOOTED = performance.now();
   const W = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : (typeof window !== 'undefined' ? window : globalThis);
-  const VERSION = '1.4.0-beta';
+  const VERSION = '1.5.0-beta';
   const TAG = '[mesh-tools]';
   const WIKI_URL = 'https://github.com/thescrawler/aprsfi-mesh-tools/blob/main/docs/Home.md'; // 📖 Help / Wiki link in Panel settings
 
@@ -147,7 +147,7 @@
   const LORA_SNR = { 5: -2.5, 6: -5, 7: -7.5, 8: -10, 9: -12.5, 10: -15, 11: -17.5, 12: -20 }; // demod floor per SF (Semtech)
   const RADIO_DEF = { freq: 910.525, sf: 7, bw: 62.5 }; // MeshCore US default
   const LINK_DEF = { txDbm: 22, gainDbi: 3, nfDb: 6 };
-  const MARGIN_STRONG = 10, MARGIN_MARGINAL = 0, FADE_DEF = 10; // fade margin (dB) subtracted before the strong/weak test
+  const MARGIN_STRONG = 10, MARGIN_FAIR = 5, MARGIN_MARGINAL = 0, FADE_DEF = 10; // dB left after the fade margin: strong / fair / weak
   // receiver sensitivity (dBm) = thermal noise -174 dBm/Hz + 10log10(BW) + noise figure + required SNR for the SF
   function loraSens(sf, bwKHz, nf) {
     sf = Math.round(+sf); if (!(sf in LORA_SNR)) sf = RADIO_DEF.sf; bwKHz = +bwKHz > 0 ? +bwKHz : RADIO_DEF.bw;
@@ -185,7 +185,7 @@
     const [, vl] = bestEdge(dist, elev, 0, m, h0, hm, lambda, near), [, vr] = bestEdge(dist, elev, m, i, hm, hr, lambda, near);
     return knifeJ(vm) + (vl > -0.78 ? knifeJ(vl) : 0) + (vr > -0.78 ? knifeJ(vr) : 0);
   }
-  // o: { range, step, rx, freqMHz, txDbm, gainDbi, sensDbm, fadeDb?, near? } -> Uint16Array [start, end, level, ...] level 2 strong / 1 marginal
+  // o: { range, step, rx, freqMHz, txDbm, gainDbi, sensDbm, fadeDb?, near? } -> Uint16Array [start, end, level, ...] level 3 strong / 2 fair / 1 weak
   function computeRaySignal(getElev, lat, lon, brg, o, h0) {
     const n = Math.floor(o.range / o.step), elev = new Float32Array(n + 1), dist = new Float32Array(n + 1);
     const near = o.near != null ? o.near : NEAR_M, lambda = 299792458 / (o.freqMHz * 1e6);
@@ -209,7 +209,7 @@
       const dif = deygoutDb(dist, elev, k, h0, hr, lambda, near);
       // diffraction (terrain blocking) is added on top; the grazing part both models share (up to 6 dB) is counted once
       const margin = budget - fsplDb(dist[k], o.freqMHz) - m - dif + Math.min(m, dif, 6);
-      const L = margin >= MARGIN_STRONG ? 2 : margin >= MARGIN_MARGINAL ? 1 : 0;
+      const L = margin >= MARGIN_STRONG ? 3 : margin >= MARGIN_FAIR ? 2 : margin >= MARGIN_MARGINAL ? 1 : 0;
       for (let j = Math.max(1, k - stride + 1); j <= k; j++) lvl[j] = L;
       if (k === n) break;
     }
@@ -222,7 +222,7 @@
   // ===== /LOSCORE =====
 
   if (typeof module !== 'undefined' && typeof GM_xmlhttpRequest === 'undefined') {
-    module.exports = { computeRay, lonLatToTilePx, destPoint, TILE_Z, DETAIL, TILE_CAP, NEAR_M, tileUrl, computeRaySignal, loraSens, fsplDb, planeEarthDb, groundExcessDb, knifeJ, deygoutDb, LORA_SNR, RADIO_DEF, LINK_DEF, MARGIN_STRONG, MARGIN_MARGINAL, FADE_DEF, tileRange, effZoom, stepForZ, tileUrl2, tilesInCircle, PREVIEW, previewZ, fineRadius, tilePlan }; return;
+    module.exports = { computeRay, lonLatToTilePx, destPoint, TILE_Z, DETAIL, TILE_CAP, NEAR_M, tileUrl, computeRaySignal, loraSens, fsplDb, planeEarthDb, groundExcessDb, knifeJ, deygoutDb, LORA_SNR, RADIO_DEF, LINK_DEF, MARGIN_STRONG, MARGIN_FAIR, MARGIN_MARGINAL, FADE_DEF, tileRange, effZoom, stepForZ, tileUrl2, tilesInCircle, PREVIEW, previewZ, fineRadius, tilePlan }; return;
   }
   if (W.__meshToolsActive) return; // installed twice
   W.__meshToolsActive = VERSION;
@@ -755,7 +755,7 @@
     const siteRadio = s => { const r = Array.isArray(s.radio) ? s.radio : []; return [r[0] || RADIO_DEF.freq, LORA_SNR[r[1]] != null ? r[1] : RADIO_DEF.sf, r[2] > 0 ? r[2] : RADIO_DEF.bw]; };
     const siteZ = s => effZoom(S.detail, s.lat, s.lon, s.range * 1000);
     // per-site key: pins may override tx height / range, so the key uses the site's effective values
-    const modeKey = s => S.mode === 'los' ? 'los' : ['sig2', S.txp, S.gain, S.fade].concat(siteRadio(s)).join('~');
+    const modeKey = s => S.mode === 'los' ? 'los' : ['sig3', S.txp, S.gain, S.fade].concat(siteRadio(s)).join('~');
     const siteKey = s => s.id + '@' + ['r2', modeKey(s), s.tx, S.rx, s.range, S.rays, S.fresnel ? 1 : 0, stepForZ(siteZ(s))].join('_');
 
     const st = { map: null, L: null, nodes: null, loading: false, err: '', layers: {}, timer: null,
@@ -915,7 +915,7 @@
     })();
     // the worker is built from the LOSCORE function sources, so there is one copy of the maths
     const WORKER_SRC = () => [
-      `const R_EARTH=${R_EARTH},K_FACTOR=${K_FACTOR},NEAR_M=${NEAR_M},MARGIN_STRONG=${MARGIN_STRONG},MARGIN_MARGINAL=${MARGIN_MARGINAL};`,
+      `const R_EARTH=${R_EARTH},K_FACTOR=${K_FACTOR},NEAR_M=${NEAR_M},MARGIN_STRONG=${MARGIN_STRONG},MARGIN_FAIR=${MARGIN_FAIR},MARGIN_MARGINAL=${MARGIN_MARGINAL};`,
       lonLatToTilePx, destPoint, computeRay, bestEdge, deygoutDb, groundExcessDb, computeRaySignal, elevFrom,
       'const fsplDb=' + fsplDb, 'const planeEarthDb=' + planeEarthDb, 'const knifeJ=' + knifeJ,
       `onmessage=e=>{const m=e.data,got=new Map(m.got),getElev=elevFrom(got,m.z,m.lat,m.lon,m.rin),ray=m.sig?computeRaySignal:computeRay,segs=[];
@@ -972,13 +972,19 @@
       step = step || segs.step || stepForZ(siteZ(site));
       const cv = document.createElement('canvas'); cv.width = cv.height = px;
       const ctx = cv.getContext('2d'), col = site.col || COLORS[site.kind] || COLORS[2];
-      ctx.fillStyle = `rgb(${col.join(',')})`;
       const n = segs.length, half = Math.PI / n * 1.02, sig = S.mode !== 'los', w = sig ? 3 : 2;
+      // Same three colours for every repeater. Lightness differs as well as hue, so they stay distinct if colour is hard to see.
+      const BAND_FILL = { 3: 'rgb(46,160,67)', 2: 'rgb(240,200,40)', 1: 'rgb(214,72,28)' };
+      if (!sig) ctx.fillStyle = `rgb(${col.join(',')})`;
+      let prevBand = 0;
       for (let i = 0; i < n; i++) {
         const brg = i / n * 2 * Math.PI, a = brg - Math.PI / 2; // canvas angle: 0 = east, bearing 0 = north
         const s = segs[i];
         for (let j = 0; j < s.length; j += w) {
-          ctx.globalAlpha = sig && s[j + 2] === 1 ? 0.4 : 1; // marginal = light, strong = solid
+          if (sig) {
+            const band = s[j + 2];
+            if (band !== prevBand) { ctx.fillStyle = BAND_FILL[band] || BAND_FILL[1]; prevBand = band; }
+          }
           const r0 = Math.max(0, (s[j] - 0.5) * step * sc), r1 = (s[j + 1] + 0.5) * step * sc;
           ctx.beginPath(); ctx.arc(c, c, r1, a - half, a + half); ctx.arc(c, c, r0, a + half, a - half, true); ctx.closePath(); ctx.fill();
         }
@@ -987,7 +993,7 @@
       ctx.beginPath(); ctx.arc(c, c, c - 1, 0, 2 * Math.PI); ctx.stroke();
       const dLat = range / 111320, dLon = range / (111320 * Math.cos(site.lat * Math.PI / 180));
       const ov = L.imageOverlay(cv.toDataURL('image/png'), [[site.lat - dLat, site.lon - dLon], [site.lat + dLat, site.lon + dLon]],
-        { opacity: sig ? 0.5 : 0.35, pane: 'meshCoverage', interactive: false });
+        { opacity: sig ? 0.55 : 0.35, pane: 'meshCoverage', interactive: false });
       const m = L.circleMarker([site.lat, site.lon], { radius: site.kind === 'pin' ? 10 : 6, color: '#000', weight: 1, fillColor: `rgb(${col.join(',')})`,
         fillOpacity: 1, pane: 'meshCoverage', bubblingMouseEvents: false });
       const po = { minWidth: 230, maxWidth: 290, autoPanPadding: [20, 20] };
@@ -1057,7 +1063,7 @@
     function estTxt(site) {
       if (S.mode === 'los') return ', line of sight' + (S.fresnel ? ', 60% F1' : '');
       const [f, sf, bw] = siteRadio(site);
-      return `, signal: ${S.txp} dBm, ${f.toFixed(1)} MHz SF${sf}/${bw} kHz${Array.isArray(site.radio) ? '' : ' (default)'}. Solid = strong, light = weak`;
+      return `, signal: ${S.txp} dBm, ${f.toFixed(1)} MHz SF${sf}/${bw} kHz${Array.isArray(site.radio) ? '' : ' (default)'}. Green = strong, yellow = fair, orange = weak`;
     }
     // ---------- per-node popup (repeater / room server) ----------
     function nodePopup(site, embed) {
@@ -1130,6 +1136,7 @@
       const old = st.layers[k]; if (old) st.map.removeLayer(old.ov); // replace the preview in place
       const grp = render(s, r.segs, r.step).addTo(st.map); st.layers[k] = { ov: grp, pv: !!pv };
       if (st.reopen != null && st.reopen === (s.kind === 'pin' ? s.pinId : s.id)) { st.reopen = null; setTimeout(() => grp._cvMarker.openPopup(), 50); }
+      syncMapLegend();
     }
     // ---------- integration with aprsfi-mesh-overlay ----------
     const overlayActive = () => { if (NODES.isActive()) return NODES.showsMeshcore(); try { const o = W.__meshOverlay; return !!W.__meshOverlayActive && (!o || !o.showsMeshcore || o.showsMeshcore()); } catch (e) { return false; } };
@@ -1288,8 +1295,22 @@
       else t = n ? `Showing ${n}. Tap a repeater to add more.` : 'Tap a repeater on the map, then “Show coverage”.';
       if (st.pinMode) t = '📍 Now tap the map where you want the pin';
       status(t);
+      syncMapLegend();
       const e = $id('cv-err');
       if (e) { e.style.display = st.err ? '' : 'none'; const m = e.querySelector('.msg'); if (m) m.textContent = st.err ? '⚠ ' + st.err + '. Tap Retry.' : ''; }
+    }
+    const BAND_LEGEND = [['#2ea043', 'Strong'], ['#f0c828', 'Fair'], ['#d6481c', 'Weak']];
+    const bandLegendHtml = () => BAND_LEGEND.map(([c, name]) => `<span class="cvleg"><i style="background:${c}"></i>${name}</span>`).join('');
+    function syncMapLegend() {
+      let el = $id('mt-cv-leg');
+      const on = state.active && S.enabled && S.mode !== 'los' && Object.keys(st.layers).length > 0;
+      if (!on) { if (el) el.hidden = true; return; }
+      if (!el) {
+        el = document.createElement('div'); el.id = 'mt-cv-leg'; el.setAttribute('aria-label', 'Coverage colours: green strong, yellow fair, orange weak');
+        document.body.appendChild(el);
+      }
+      if (!el.dataset.ready) { el.innerHTML = bandLegendHtml(); el.dataset.ready = '1'; }
+      el.hidden = false;
     }
     const sel = (id, label, tip, opts, cur, unit) => `<div class="mt-row" title="${esc(tip)}"><span class="lb">${label}</span><select id="${id}">${opts.map(v => `<option value="${v}"${v === cur ? ' selected' : ''}>${v}${unit}</option>`).join('')}</select></div>`;
     function updSelUI() { const e = $id('cv-selc'); if (e) e.textContent = Object.keys(st.sel).length ? `${Object.keys(st.sel).length} picked` : 'None picked yet'; }
@@ -1331,7 +1352,7 @@
       cb('cv-en', 'enabled', 'cv_enabled'); cb('cv-rep', 'showRep', 'cv_rep'); cb('cv-room', 'showRoom', 'cv_room'); cb('cv-all', 'allRep', 'cv_all'); cb('cv-fr', 'fresnel', 'cv_fresnel', true);
       const sl = (id, key, opts, recompute) => $id(id).addEventListener('change', e => { S[key] = pick(e.target.value, opts, S[key]); GM_setValue('cv_' + key, S[key]); if (!state.active) return; recompute ? settingsChanged() : refresh(); });
       sl('cv-age', 'age', OPTS.age); sl('cv-rays', 'rays', OPTS.rays, 1); sl('cv-txp', 'txp', OPTS.txp, 1); sl('cv-gain', 'gain', OPTS.gain, 1); sl('cv-fade', 'fade', OPTS.fade, 1);
-      const leg = () => { const e = $id('cv-legend'); if (e) e.innerHTML = S.mode === 'los' ? 'Shaded = clear view of the repeater over the hills.' : '<b>Solid</b> = strong signal · <b>light</b> = weak, may work · none = unlikely'; };
+      const leg = () => { const e = $id('cv-legend'); if (e) e.innerHTML = S.mode === 'los' ? 'Shaded = clear view of the repeater over the hills.' : bandLegendHtml() + '<span class="cvleg">Clear = unlikely</span>'; syncMapLegend(); };
       leg(); $id('cv-mode').addEventListener('change', e => { S.mode = e.target.value === 'los' ? 'los' : 'signal'; GM_setValue('cv_mode', S.mode); leg(); if (state.active) settingsChanged(); });
       $id('cv-pin').addEventListener('click', () => { if (!state.active) return; st.pinMode = !st.pinMode; updPinBtn(); idleStatus(Object.keys(st.layers).length); });
       $id('cv-clrsel').addEventListener('click', () => { st.sel = {}; saveSel(); if (!state.active) return; st.map.closePopup(); refresh(); });
@@ -1375,6 +1396,7 @@
       map.off('moveend zoomend', scheduleRefresh); map.off('popupopen', onPopupOpen); map.off('click', onMapClick);
       for (const l of Object.values(st.layers)) map.removeLayer(l.ov); st.layers = {};
       if (st.marks) { map.removeLayer(st.marks); st.marks = null; }
+      syncMapLegend();
     }
     return { sectionHtml, wire, init, disable, refresh, isActive: () => state.active, isBusy: () => st.loading || st.busy,
       _detail: { DETAIL, effZoom, stepForZ, tileRange, tileUrl, siteZ, siteKey, get: () => S.detail },
@@ -1689,6 +1711,11 @@
     #mt-panel .ig select.dv{flex:1 1 auto;width:auto!important;min-width:0;margin:0!important;border-radius:8px 0 0 8px}
     #mt-panel .ig select.hu{flex:0 0 52px;width:52px!important;min-width:0;margin:0!important;border-left:0;border-radius:0 8px 8px 0;background:var(--mt-bg2)}
     #mt-panel .hint{background:#eef5ff;border:1px solid #d5e5fb;border-radius:8px;padding:8px 10px;font-size:13px;margin:0 0 10px;color:#1f3b5c}
+    #mt-panel .cvleg{display:inline-flex;align-items:center;margin:2px 8px 2px 0;white-space:nowrap}
+    #mt-panel .cvleg i,#mt-cv-leg i{display:inline-block;width:14px;height:14px;margin-right:4px;border-radius:3px;border:1px solid rgba(0,0,0,.28);flex:none}
+    #mt-cv-leg{position:fixed;left:8px;bottom:28px;z-index:99990;display:flex;gap:8px;align-items:center;padding:5px 8px;background:rgba(255,255,255,.92);border:1px solid rgba(0,0,0,.12);border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.15);font:12px/1.2 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#1f2933;pointer-events:none}
+    #mt-cv-leg[hidden]{display:none}
+    #mt-cv-leg .cvleg{margin:0}
     #mt-panel .info{color:var(--mt-mut);font-size:12px;margin:8px 0 0}
     #mt-panel .info:empty{display:none}
     #mt-panel .sec{font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--mt-mut);text-transform:uppercase;margin:12px 0 2px}
@@ -1806,7 +1833,7 @@
     'cv-range': 'How far out from the repeater to check. Bigger takes longer to work out.',
     'cv-detail': 'How fine the hill map is. Sharp catches small ridges but downloads more and is slower.',
     'cv-rays': 'How many directions are checked around the repeater. More = smoother shading, but slower.',
-    'cv-mode': 'Signal strength (recommended) estimates how strong the repeater would be, including signal bending over hills. Solid shading is strong, light shading is weak but may work. Clear view only shades places with a straight, unblocked line to the repeater (the older, stricter method).',
+    'cv-mode': 'Signal strength (recommended) estimates how strong the repeater would be, including signal bending over hills. Green is strong, yellow is fair, and orange is weak. Clear view only shades places with a straight, unblocked line to the repeater (the older, stricter method).',
     'cv-txp': 'How much power the repeater transmits. Most MeshCore repeaters use 22 dBm. Only used for Signal strength.',
     'cv-gain': 'Antenna gain, used for both the repeater and your radio. A typical small antenna is about 3 dBi. Only used for Signal strength.',
     'cv-fade': 'A safety cushion. Real signals come and go (people, trucks, weather, a hand on the radio), so the map only counts a spot as covered if the signal is this much stronger than the bare minimum. 10 is a good everyday choice. Lower shows more area but expect dropouts; higher shows only very dependable spots. Only used for Signal strength.',

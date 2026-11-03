@@ -1,5 +1,8 @@
 # 📝 Changelog
 
+## Nov 3, 2026: 1.5.0-beta
+- **Coverage colours are easier to tell apart.** Signal strength used to be a dark and a light shade of the same colour. It is now **green** for strong (at least 10 dB to spare, after the fade margin), **yellow** for fair (5 to 10 dB), and **orange** for weak (0 to 5 dB). Nothing is drawn below 0 dB. The colours also differ in lightness. A **Strong / Fair / Weak** legend sits on the Coverage tab and at the bottom-left of the map while coverage is showing. Older saved maps are worked out again so the new colours apply.
+
 ## Nov 3, 2026: docs
 - Phone install: step-by-step way to open Tampermonkey's Utilities tab before Import from URL. Firefox for Android is spelled out (menu, Extensions, Dashboard, slide to Utilities). Edge, Kiwi, and iPhone Safari are included briefly.
 - New page [What is Tampermonkey](What-is-Tampermonkey.md): what the add-on is, and how to use the panel after it is installed (computer and phone). Linked from the home page, README, and Installation.

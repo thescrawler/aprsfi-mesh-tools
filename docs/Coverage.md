@@ -11,8 +11,8 @@ The Coverage tab shades the area a **MeshCore repeater** (or any spot you choose
 1. **Zoom in** to zoom level 9 or closer (about county level). Further out, the status line says *"Zoom in closer to pick a repeater"*.
 2. Tap a red **◆R** repeater (or a purple **◆S** room server). In its popup, tap **Show coverage**.
 3. The status line shows progress, e.g. `1/1 Hilltop: Loading terrain 37/110`, then `Computing…`.
-4. A shaded area appears in that repeater's own colour, with a **dashed circle** marking the distance limit. With **Signal strength** (the default), **solid** shading = strong signal, **light** shading = weak but may work, clear = unlikely.
-5. To compare repeaters, tap more of them and tap **Show coverage** on each. Each one gets its own colour (8 colours rotate).
+4. A shaded area appears, with a **dashed circle** marking the distance limit. With **Signal strength** (the default), the colour is the strength: **green = strong**, **yellow = fair**, **orange = weak**. Clear map means unlikely. The same three colours are used for every repeater. A small legend sits on this tab and at the bottom-left of the map while coverage is showing.
+5. To compare repeaters, tap more of them and tap **Show coverage** on each. The dot on the repeater still has its own colour so you can tell them apart. The shaded area stays green, yellow, or orange.
 6. To test a spot with no repeater, open the Coverage tab and tap **📍 Drop a pin to test a spot**, then tap the map. Pins are **orange**.
 
 If the 📡 Mesh nodes tab is showing MeshCore nodes, the coverage controls appear inside the normal ◆ popups. The Coverage tab also draws its own small round markers for repeaters (red) and room servers (purple) when those ◆ markers are not on the map. **Show MeshCore nodes** hides those dots too, including when you are zoomed out. **Repeaters** and **Room servers** under that switch hide the matching dots on their own. Turn the switch back on to tap a repeater, or use **Drop a pin**. A repeater you already chose with **Show coverage**, and any pin, stays on the map.
@@ -143,7 +143,7 @@ Steps 1 to 4 are the same. Then, every few hundred metres along each ray, the sc
 - **Hill loss:** **Deygout knife-edge diffraction** over up to **3 ridges** (the worst ridge, then the worst one on each side of it). Signals can bend over a ridge and lose some strength, instead of stopping dead. This is added on top of the ground-reflection loss, so hills still block. The first 6 dB of "just grazing the ground" loss, which both models describe, is only counted once.
 - **Link budget:** repeater power (default 22 dBm) + antenna gain at both ends (default 3 dBi each) - losses, compared with the receiver's **sensitivity**. Sensitivity is worked out from the node's own **spreading factor (SF)** and **bandwidth** when it reports them on map.meshcore.io: `-174 + 10·log10(BW in Hz) + 6 dB noise figure + the SNR that SF needs`. Otherwise it uses the MeshCore US default of 910.525 MHz, SF7, 62.5 kHz (about **-127.5 dBm**).
 - **Fade margin:** the *Fade margin* setting (default 10 dB) is taken off what's left, as a safety cushion.
-- **Shading:** after the fade margin, at least **10 dB** to spare = **strong** (solid). **0 to 10 dB** to spare = **weak** (light). Less = not shaded.
+- **Shading:** after the fade margin, the spare signal is painted in three colours (about 55% see-through, so the map still shows). **10 dB or more** to spare = **strong** (green). **5 to 10 dB** = **fair** (yellow). **0 to 5 dB** = **weak** (orange). Less than 0 = not shaded. Green is the darkest of the three, yellow the lightest, so they still differ if colour is hard to tell apart. The legend on the Coverage tab and at the bottom-left of the map uses the same swatches.
 
 Ground within 100 m of the antenna never counts as a ridge, in either mode.
 
