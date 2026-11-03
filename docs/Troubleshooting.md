@@ -34,7 +34,7 @@ Those plain red circles are repeater dots drawn by the Coverage tab (purple ones
 - **Zoom in.** Nodes only show at map zoom 6 or closer.
 - **Check the switches** *Show MeshCore nodes* / *Show Meshtastic nodes*.
 - **Raise "Heard from in the last"** (Advanced) to 30 or 90 days. Quiet nodes may be filtered out.
-- **First load is slow.** The MeshCore list can take up to a minute the first time.
+- **First visit is slower than the next one.** The MeshCore list is a large download the first time. From **1.3.1-beta**, later visits draw the saved list immediately. If nodes are still missing, wait for the status line to leave *Loading…*, or tap **⟳ Download fresh node lists**.
 - **Meshtastic:** only internet/MQTT-connected nodes are on meshmap.net. Many real radios won't appear.
 - **Allow the connection.** If Tampermonkey asked to allow `map.meshcore.io` or `meshmap.net` and you clicked *Forbid*, open the Tampermonkey **Dashboard**, then the script, then **Settings**, and remove the blocked domain or add it to the allowed list (or reinstall).
 - **Red error box?** Tap **↻ Retry**, or **⟳ Download fresh node lists** under Advanced. The source site may be temporarily down.

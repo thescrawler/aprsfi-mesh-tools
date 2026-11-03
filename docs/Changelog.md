@@ -1,5 +1,8 @@
 # 📝 Changelog
 
+## Nov 3, 2026: 1.3.1-beta
+- **MeshCore nodes appear much sooner.** The full list from map.meshcore.io is about 55 MB, so the very first visit still has to download it. That download now starts as soon as the page starts, instead of waiting until the map is ready. On later visits the saved list is drawn immediately and a fresh copy loads behind it. Panning the map keeps markers that are already on screen. **Show MeshCore nodes** off still hides every MeshCore marker, including the old plain circles.
+
 ## Nov 3, 2026: 1.3.0-beta
 - **Hide APRS objects by type.** aprs.fi only had one switch for every object. The Map layers tab now has six rows under **Objects**: Repeaters & towers, Weather & alerts, Events, Emergency, Generic markers, and Other objects. Each row shows the same symbol aprs.fi draws on the map, and the ⓘ button explains that kind in plain language. **Objects** still hides them all. Choices are remembered. Real stations, weather stations and ships are unchanged.
 

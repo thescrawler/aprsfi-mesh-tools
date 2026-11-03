@@ -44,10 +44,10 @@ All settings are remembered between visits.
 
 ## How the data is loaded
 
-- The **MeshCore** list (`map.meshcore.io/api/v1/nodes`) is large. The first download can take up to a minute, and the status line says *"Loading… (first time can take up to a minute)"*. The Coverage tab reuses the same download, so it's never fetched twice at once.
-- The **Meshtastic** list comes from `meshmap.net/nodes.json`.
-- Lists are kept in memory for **10 minutes**. Moving or zooming the map after that downloads them again.
-- Markers are redrawn about 0.6 seconds after you stop moving the map. Only nodes in (or just around) the visible area are drawn.
+- The **MeshCore** list (`map.meshcore.io/api/v1/nodes`) is large (about 55 MB). The download starts as soon as the aprs.fi page starts. The very first visit waits for that download. After that, the saved list is drawn straight away and a fresh copy loads in the background. The Coverage tab reuses the same download, so it's never fetched twice at once.
+- The **Meshtastic** list comes from `meshmap.net/nodes.json`, with the same saved-list behaviour.
+- A fresh list is kept for **10 minutes**. Moving the map does not download it again.
+- Markers update about 0.6 seconds after you stop moving the map. Only nodes in (or just around) the visible area are drawn, and ones already on screen are left in place.
 - If a download fails, a red box explains why (for example *"no internet connection, or the site is blocked"* or *"it took too long"*). Tap **↻ Retry**.
 
 The map data comes from public community services. Positions are whatever each radio advertised, which may be approximate or deliberately offset by its owner.

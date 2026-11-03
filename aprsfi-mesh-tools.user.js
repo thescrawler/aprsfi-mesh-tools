@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         aprs.fi Mesh Tools (beta)
 // @namespace    https://greasyfork.org/users/aprsfi-mesh-overlay
-// @version      1.3.0-beta
+// @version      1.3.1-beta
 // @description  One easy panel for aprs.fi: see MeshCore & Meshtastic radios on the map, check roughly where a repeater can reach, and hide map clutter. Bundles Mesh Overlay, Mesh Coverage and Map Layer Toggles.
 // @author       aprsfi-mesh-overlay contributors
 // @license      MIT
@@ -19,7 +19,7 @@
 // @connect      map.meshcore.io
 // @connect      meshmap.net
 // @connect      s3.amazonaws.com
-// @run-at       document-idle
+// @run-at       document-start
 // ==/UserScript==
 /*
  * MIT License — Copyright (c) 2026 aprsfi-mesh-overlay contributors.
@@ -48,8 +48,9 @@
   // Binding them locally here makes those lookups plain variable reads; the heavy loop also runs in a Web Worker.
   const { Math, isFinite, Float32Array, Float64Array, Uint8Array, Uint16Array, Int16Array, Array, Map, Set, Promise, Object, Date, Number, JSON, Error } = globalThis;
   const performance = globalThis.performance || { now: () => Date.now() };
+  const BOOTED = performance.now();
   const W = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : (typeof window !== 'undefined' ? window : globalThis);
-  const VERSION = '1.3.0-beta';
+  const VERSION = '1.3.1-beta';
   const TAG = '[mesh-tools]';
   const WIKI_URL = 'https://github.com/thescrawler/aprsfi-mesh-tools/blob/main/docs/Home.md'; // 📖 Help / Wiki link in Panel settings
 
@@ -247,13 +248,51 @@
     return 'something went wrong';
   }
   const MC_URL = 'https://map.meshcore.io/api/v1/nodes', MT_URL = 'https://meshmap.net/nodes.json';
-  let mcInflight = null; // de-duplicates the big MeshCore download between "Mesh nodes" and "Coverage"
-  function loadMeshcoreRaw() {
-    if (mcInflight) return mcInflight;
-    mcInflight = gmGet(MC_URL, 'text', 180000).then(r => { let a = JSON.parse(r.responseText); if (!Array.isArray(a)) a = a.nodes || a.data || []; return a; });
-    mcInflight.then(() => { mcInflight = null; }, () => { mcInflight = null; });
-    return mcInflight;
+  // The MeshCore list is ~55 MB / ~70,000 radios. Remember the last result so Coverage and
+  // Mesh nodes share one download, including one started at document-start before the map exists.
+  let mcMemo = null;
+  function loadMeshcoreRaw(force) {
+    if (!force && mcMemo && Date.now() - mcMemo.t < 10 * 60 * 1000) return mcMemo.p;
+    const p = gmGet(MC_URL, 'text', 180000).then(r => { let a = JSON.parse(r.responseText); if (!Array.isArray(a)) a = a.nodes || a.data || []; return a; });
+    let wrapped;
+    wrapped = p.then(a => a, e => { if (mcMemo && mcMemo.p === wrapped) mcMemo = null; throw e; });
+    mcMemo = { t: Date.now(), p: wrapped };
+    return wrapped;
   }
+  let mtMemo = null;
+  function loadMeshtasticRaw(force) {
+    if (!force && mtMemo && Date.now() - mtMemo.t < 10 * 60 * 1000) return mtMemo.p;
+    const p = gmGet(MT_URL, 'text', 60000).then(r => JSON.parse(r.responseText));
+    let wrapped;
+    wrapped = p.then(a => a, e => { if (mtMemo && mtMemo.p === wrapped) mtMemo = null; throw e; });
+    mtMemo = { t: Date.now(), p: wrapped };
+    return wrapped;
+  }
+  // Slim lists (lat/lon/name/type/heard/id) survive in IndexedDB. A full JSON copy is too big for localStorage.
+  const NodeCache = (() => {
+    let dbp = null;
+    const open = () => dbp || (dbp = new Promise(res => {
+      try {
+        const r = indexedDB.open('mesh-tools-nodes', 1);
+        r.onupgradeneeded = () => { try { r.result.createObjectStore('n'); } catch (e) { /* */ } };
+        r.onsuccess = () => res(r.result);
+        r.onerror = r.onblocked = () => res(null);
+      } catch (e) { res(null); }
+    }));
+    const req = (key, val) => open().then(db => new Promise(res => {
+      if (!db) return res(null);
+      try {
+        const q = val === undefined ? db.transaction('n').objectStore('n').get(key) : db.transaction('n', 'readwrite').objectStore('n').put(val, key);
+        q.onsuccess = () => res(q.result || true); q.onerror = () => res(null);
+      } catch (e) { res(null); }
+    }));
+    return { get: key => req(key), put: (key, val) => { req(key, val); } };
+  })();
+  const mcCacheP = NodeCache.get('mc');
+  const mtCacheP = NodeCache.get('mt');
+  // Start the big download immediately, in parallel with aprs.fi's own map setup. Skip it when the user has hidden that network.
+  try { if (GM_getValue('show_meshcore', true) !== false) loadMeshcoreRaw(); } catch (e) { /* */ }
+  try { if (GM_getValue('show_meshtastic', true) !== false) loadMeshtasticRaw(); } catch (e) { /* */ }
 
   // ================= conflict detection (old separate scripts) =================
   const OLD = {
@@ -280,8 +319,15 @@
       show: { meshcore: GM_getValue('show_meshcore', true), meshtastic: GM_getValue('show_meshtastic', true) },
       data: { meshcore: null, meshtastic: null }, fetchedAt: { meshcore: 0, meshtastic: 0 },
       loading: { meshcore: false, meshtastic: false }, error: { meshcore: '', meshtastic: '' },
-      layers: {}, map: null, L: null, timer: null, active: false
+      layers: {}, map: null, L: null, timer: null, active: false,
+      stale: { meshcore: false, meshtastic: false },
+      index: { meshcore: null, meshtastic: null }, indexed: { meshcore: null, meshtastic: null },
+      byKey: { meshcore: new Map(), meshtastic: new Map() },
+      drawGen: { meshcore: 0, meshtastic: 0 }, painted: { meshcore: false, meshtastic: false },
+      inflight: { meshcore: null, meshtastic: null }
     };
+    const iconCache = {};
+    const KEEP_MS = 90 * 86400000; // saved list covers the longest "heard in the last" choice
 
     function mcFields(n) {
       const f = [], p = n.params || {};
@@ -298,10 +344,11 @@
       for (const n of arr || []) {
         const lat = +n.adv_lat, lon = +n.adv_lon;
         if (!isFinite(lat) || !isFinite(lon) || (lat === 0 && lon === 0)) continue;
+        const key = n.public_key ? String(n.public_key) : '';
         out.push({ src: 'meshcore', lat, lon, name: (n.adv_name || '').trim() || '(unnamed)',
           typeId: n.type, type: MC_TYPES[n.type] || ('type ' + n.type),
           heard: n.last_advert ? Date.parse(n.last_advert) : (n.updated_date ? Date.parse(n.updated_date) : 0),
-          id: n.public_key ? n.public_key.slice(0, 12) : '', key: n.public_key ? String(n.public_key) : '', fields: mcFields(n), params: n.params || null });
+          id: key.slice(0, 12), key, params: n.params || null, source: n.source || '', inserted_date: n.inserted_date || '' });
       }
       return out;
     }
@@ -331,18 +378,54 @@
       }
       return out;
     }
-    async function ensureData(src, force) {
-      if (state.loading[src]) return;
-      if (!force && state.data[src] && Date.now() - state.fetchedAt[src] < CFG.cacheMs) return;
-      state.loading[src] = true; setStatus(src, 'Loading… (first time can take up to a minute)');
-      try {
-        if (src === 'meshcore') state.data[src] = normMeshcore(await loadMeshcoreRaw());
-        else state.data[src] = normMeshtastic(JSON.parse((await gmGet(MT_URL, 'text', 60000)).responseText));
-        state.fetchedAt[src] = Date.now(); state.error[src] = '';
-      } catch (e) {
-        console.warn(TAG, src, e);
-        state.error[src] = friendly(e);
-      } finally { state.loading[src] = false; showError(); }
+    function slimList(src, nodes) {
+      const cut = Date.now() - KEEP_MS, out = [];
+      for (const n of nodes) {
+        if (n.heard && n.heard < cut) continue;
+        if (src === 'meshcore') out.push([Math.round(n.lat * 1e5), Math.round(n.lon * 1e5), n.name, n.typeId | 0, n.heard | 0, n.key || '']);
+        else out.push([Math.round(n.lat * 1e5), Math.round(n.lon * 1e5), n.name, n.role || '', n.heard | 0, n.id || '', n.hw || '']);
+      }
+      return out;
+    }
+    function expandList(src, rows) {
+      const out = [];
+      for (const a of rows || []) {
+        if (src === 'meshcore') {
+          const key = a[5] || '';
+          out.push({ src, lat: a[0] / 1e5, lon: a[1] / 1e5, name: a[2] || '(unnamed)', typeId: a[3], type: MC_TYPES[a[3]] || ('type ' + a[3]), heard: a[4] || 0, id: key.slice(0, 12), key, params: null });
+        } else {
+          out.push({ src, lat: a[0] / 1e5, lon: a[1] / 1e5, name: a[2] || '(unnamed)', type: a[3] || 'unknown role', role: a[3] || '', heard: a[4] || 0, id: a[5] || '', hw: a[6] || '', fields: null });
+        }
+      }
+      return out;
+    }
+    function applyCache(src, rec) {
+      if (!state.active || !state.show[src] || !rec || !rec.nodes || !rec.nodes.length) return;
+      if (state.data[src] && !state.stale[src]) return; // a fresh download already won
+      state.data[src] = expandList(src, rec.nodes);
+      state.stale[src] = true; state.fetchedAt[src] = 0;
+      draw(src);
+    }
+    function ensureFresh(src, force) {
+      if (!force && state.inflight[src]) return state.inflight[src];
+      if (!force && state.data[src] && !state.stale[src] && Date.now() - state.fetchedAt[src] < CFG.cacheMs) return Promise.resolve();
+      state.loading[src] = true;
+      if (!state.data[src]) setStatus(src, 'Loading… (first time can take a few seconds)');
+      const p = (async () => {
+        try {
+          const nodes = src === 'meshcore' ? normMeshcore(await loadMeshcoreRaw(force)) : normMeshtastic(await loadMeshtasticRaw(force));
+          if (src === 'meshcore') mcMemo = null; else mtMemo = null; // drop the raw list; the slim copy is what we keep
+          state.data[src] = nodes; state.fetchedAt[src] = Date.now(); state.stale[src] = false; state.error[src] = '';
+          NodeCache.put(src === 'meshcore' ? 'mc' : 'mt', { t: state.fetchedAt[src], nodes: slimList(src, nodes) });
+          if (state.active) draw(src);
+        } catch (e) {
+          console.warn(TAG, src, e);
+          state.error[src] = friendly(e);
+          if (!state.data[src]) setStatus(src, 'Not loaded');
+        } finally { state.loading[src] = false; state.inflight[src] = null; showError(); }
+      })();
+      state.inflight[src] = p;
+      return p;
     }
     function ago(t) {
       if (!t) return 'unknown';
@@ -354,12 +437,14 @@
     const label = n => n.src === 'meshcore' ? `MeshCore ${n.type}: ${n.name}` : `Meshtastic: ${n.name}`;
     function icon(n) {
       const L = state.L;
+      const k = n.src === 'meshcore' ? 'm' + (n.typeId || 0) : 't';
+      if (iconCache[k]) return iconCache[k];
       if (n.src === 'meshcore') {
         const c = MC_COLORS[n.typeId] || '#555', letter = { 1: 'C', 2: 'R', 3: 'S', 4: 's' }[n.typeId] || '?';
-        return L.divIcon({ className: 'mo-ico', iconSize: [22, 22], iconAnchor: [11, 11],
+        return iconCache[k] = L.divIcon({ className: 'mo-ico', iconSize: [22, 22], iconAnchor: [11, 11],
           html: `<div style="width:20px;height:20px;background:${c};border:2px solid #fff;transform:rotate(45deg);box-shadow:0 0 2px #000;display:flex;align-items:center;justify-content:center"><b style="transform:rotate(-45deg);color:#fff;font:bold 11px sans-serif">${letter}</b></div>` });
       }
-      return L.divIcon({ className: 'mo-ico', iconSize: [20, 20], iconAnchor: [10, 10],
+      return iconCache[k] = L.divIcon({ className: 'mo-ico', iconSize: [20, 20], iconAnchor: [10, 10],
         html: `<div style="width:18px;height:18px;border-radius:50%;background:${MT_COLOR};border:2px solid #fff;box-shadow:0 0 2px #000;color:#fff;font:bold 10px sans-serif;display:flex;align-items:center;justify-content:center">M</div>` });
     }
     function popup(n) {
@@ -369,7 +454,8 @@
       else { row('Role', n.role || 'unknown'); if (n.hw) row('Hardware', n.hw); }
       row('Last heard', ago(n.heard) + (n.heard ? ' (' + new Date(n.heard).toLocaleString() + ')' : ''));
       row('Position', n.lat.toFixed(5) + ', ' + n.lon.toFixed(5));
-      for (const [k, v] of n.fields || []) row(k, v);
+      const fields = n.fields || (n.src === 'meshcore' && n.params ? mcFields(n) : []);
+      for (const [k, v] of fields) row(k, v);
       if (n.id) row('ID', n.id);
       const da = n.src === 'meshcore' && n.key ? ` class="mo-pp" data-mesh-key="${esc(n.key)}" data-mesh-type="${esc(n.typeId)}"` : ' class="mo-pp"';
       return `<div${da} style="font:14px sans-serif;min-width:180px">
@@ -377,43 +463,110 @@
         <small style="color:#666">${n.src === 'meshcore' ? 'MeshCore · map.meshcore.io' : 'Meshtastic · meshmap.net'}</small>
         <table style="border-collapse:collapse;margin-top:4px;font-size:12px">${rows.join('')}</table></div>`;
     }
+    function useIndex(src) {
+      const nodes = state.data[src];
+      if (!nodes) return null;
+      if (state.indexed[src] !== nodes) {
+        const idx = new Map();
+        for (const n of nodes) { const k = n.key || n.id; if (k) idx.set(k, n); }
+        state.index[src] = idx; state.indexed[src] = nodes;
+      }
+      return state.index[src];
+    }
+    const nodeKey = n => n.key || n.id || (Math.round(n.lat * 1e5) + ',' + Math.round(n.lon * 1e5));
+    function makeMarker(n) {
+      const L = state.L, key = nodeKey(n);
+      const m = L.marker([n.lat, n.lon], { icon: icon(n), title: label(n), zIndexOffset: 1000, meshKey: key,
+        meshNode: { src: n.src, public_key: key, type: n.typeId, lat: n.lat, lon: n.lon, name: n.name, heard: n.heard } });
+      // Popup HTML is built on open, not for every marker. The lookup sees the latest node after a background refresh.
+      m.bindPopup(() => {
+        const idx = useIndex(n.src);
+        const cur = (idx && idx.get(key)) || n;
+        m.options.meshNode = { src: cur.src, public_key: cur.key || cur.id, type: cur.typeId, lat: cur.lat, lon: cur.lon, name: cur.name, heard: cur.heard };
+        return popup(cur);
+      }, { maxWidth: 280 });
+      m.bindTooltip(esc(label(n)), { direction: 'top', offset: [0, -10] });
+      return m;
+    }
     function draw(src) {
-      const L = state.L, map = state.map, layer = state.layers[src];
-      if (!layer) return;
-      // 1.1.3: keep the marker whose popup is open. Opening a popup can auto-pan the map; the resulting
-      // moveend redraw used to remove that marker and close its popup the first time you clicked it.
+      const map = state.map, layer = state.layers[src];
+      if (!layer || !map) return;
+      const bag = state.byKey[src];
       const pp = map._popup, keep = pp && pp.isOpen && pp.isOpen() && pp._source && layer.hasLayer(pp._source) ? pp._source : null;
-      layer.eachLayer(l => { if (l !== keep) layer.removeLayer(l); });
-      if (!state.active) return;
-      if (!state.show[src]) return setStatus(src, 'Hidden');
-      if (map.getZoom() < CFG.minZoom) return setStatus(src, 'Zoom in closer to see them');
+      // 1.2.1: Show MeshCore / Meshtastic off means nothing from that network, at every zoom. No placeholder dots.
+      if (!state.active || !state.show[src] || map.getZoom() < CFG.minZoom) {
+        state.drawGen[src]++;
+        if (keep && !state.show[src]) { try { map.closePopup(); } catch (e) { /* */ } }
+        bag.forEach(m => { if (m !== keep || !state.show[src]) layer.removeLayer(m); });
+        if (!state.show[src]) bag.clear();
+        else bag.forEach((m, k) => { if (!layer.hasLayer(m)) bag.delete(k); });
+        if (!state.show[src]) return setStatus(src, 'Hidden');
+        if (map.getZoom() < CFG.minZoom) return setStatus(src, 'Zoom in closer to see them');
+        return;
+      }
       const nodes = state.data[src];
       if (!nodes) { if (state.error[src]) setStatus(src, 'Not loaded'); return; }
-      const b = map.getBounds().pad(0.1), c = map.getCenter();
+      const b = map.getBounds(), c = map.getCenter();
+      const latPad = Math.abs(b.getNorth() - b.getSouth()) * 0.1;
+      const west0 = b.getWest(), east0 = b.getEast(), wrap = west0 > east0;
+      const lonSpan = wrap ? (180 - west0) + (east0 + 180) : (east0 - west0);
+      const lonPad = Math.abs(lonSpan) * 0.1;
+      const south = b.getSouth() - latPad, north = b.getNorth() + latPad, west = west0 - lonPad, east = east0 + lonPad;
       const cutoff = Date.now() - CFG.maxAgeDays * 86400000;
-      let vis = nodes.filter(n => b.contains([n.lat, n.lon]) && (!n.heard || n.heard >= cutoff));
+      const seen = new Set();
+      let vis = [];
+      for (const n of nodes) {
+        if (n.heard && n.heard < cutoff) continue;
+        if (n.lat < south || n.lat > north) continue;
+        if (!wrap) { if (n.lon < west || n.lon > east) continue; }
+        else if (n.lon < west && n.lon > east) continue;
+        const key = nodeKey(n); if (seen.has(key)) continue; seen.add(key);
+        vis.push(n);
+      }
       const total = vis.length;
       if (vis.length > CFG.maxMarkersPerLayer) {
-        vis.sort((a, z) => ((a.lat - c.lat) ** 2 + (a.lon - c.lng) ** 2) - ((z.lat - c.lat) ** 2 + (z.lon - c.lng) ** 2));
+        const clat = c.lat, clng = c.lng;
+        vis.sort((a, z) => ((a.lat - clat) ** 2 + (a.lon - clng) ** 2) - ((z.lat - clat) ** 2 + (z.lon - clng) ** 2));
         vis = vis.slice(0, CFG.maxMarkersPerLayer);
       }
-      const keepKey = keep && keep.options.meshKey;
+      const want = new Set();
+      for (const n of vis) want.add(nodeKey(n));
+      bag.forEach((m, k) => { if (!want.has(k) && m !== keep) { layer.removeLayer(m); bag.delete(k); } });
+      const fresh = [];
       for (const n of vis) {
-        if (keep && (n.key || n.id) === keepKey) continue;
-        L.marker([n.lat, n.lon], { icon: icon(n), title: label(n), zIndexOffset: 1000, meshKey: n.key || n.id,
-          meshNode: { src: n.src, public_key: n.key || n.id, type: n.typeId, lat: n.lat, lon: n.lon, name: n.name, heard: n.heard } })
-          .bindTooltip(esc(label(n)), { direction: 'top', offset: [0, -10] })
-          .bindPopup(popup(n), { maxWidth: 280 })
-          .addTo(layer);
+        const k = nodeKey(n); if (bag.has(k)) {
+          const m = k && bag.get(k); if (m) { const ll = m.getLatLng(); if (Math.abs(ll.lat - n.lat) > 1e-5 || Math.abs(ll.lng - n.lon) > 1e-5) m.setLatLng([n.lat, n.lon]); }
+          continue;
+        }
+        fresh.push(n);
       }
+      state.drawGen[src]++;
+      const gen = state.drawGen[src];
+      // Add in short slices so the first markers appear immediately and a phone stays responsive.
+      let i = 0;
+      const step = () => {
+        if (gen !== state.drawGen[src] || !state.show[src]) return;
+        const t0 = performance.now();
+        for (; i < fresh.length && performance.now() - t0 < 12; i++) {
+          const n = fresh[i], k = nodeKey(n);
+          if (bag.has(k)) continue;
+          bag.set(k, makeMarker(n).addTo(layer));
+        }
+        if (i < fresh.length) setTimeout(step, 0);
+        else if (!state.painted[src]) {
+          state.painted[src] = true;
+          console.log(TAG, src, 'first markers', bag.size, 'in', Math.round(performance.now() - BOOTED) + 'ms', state.stale[src] ? '(saved list)' : '(fresh)');
+        }
+      };
+      step();
       setStatus(src, total === 0 ? 'None here' : (total > vis.length ? `${vis.length} nearest of ${total} here` : `${total} here`));
     }
-    async function refresh(force) {
+    function refresh(force) {
       if (!state.active) return;
       for (const src of ['meshcore', 'meshtastic']) {
-        if (!state.show[src]) { draw(src); continue; }
-        if (state.map.getZoom() >= CFG.minZoom || force) await ensureData(src, force);
-        draw(src);
+        draw(src); // saved or in-memory list, right away. Hidden networks draw nothing.
+        if (!state.show[src]) continue;
+        if (state.map.getZoom() >= CFG.minZoom || force) ensureFresh(src, force);
       }
       showError();
     }
@@ -457,16 +610,21 @@
       $id('mo-max').addEventListener('change', e => { CFG.maxMarkersPerLayer = pick(e.target.value, MAX_OPTS, 400); GM_setValue('max_markers', CFG.maxMarkersPerLayer); refresh(); });
     }
     function init(map) {
+      if (state.active) return;
       state.map = map; state.L = W.L; state.active = true;
       state.layers.meshcore = state.L.layerGroup().addTo(map);
       state.layers.meshtastic = state.L.layerGroup().addTo(map);
       map.on('moveend zoomend', scheduleRefresh);
+      mcCacheP.then(rec => applyCache('meshcore', rec));
+      mtCacheP.then(rec => applyCache('meshtastic', rec));
       refresh();
     }
     function disable() {
       if (!state.active) return; state.active = false; clearTimeout(state.timer);
       if (state.map) { state.map.off('moveend zoomend', scheduleRefresh); for (const l of Object.values(state.layers)) state.map.removeLayer(l); }
       state.layers = {};
+      state.byKey.meshcore.clear(); state.byKey.meshtastic.clear();
+      state.drawGen.meshcore++; state.drawGen.meshtastic++;
     }
     return {
       sectionHtml, wire, init, disable, refresh,
@@ -476,7 +634,7 @@
       // toggle only, ignoring zoom: coverage's plain dots must follow the switch even when zoomed out
       meshcoreWanted: () => !!state.show.meshcore,
       // slim repeater/room list for Coverage, derived from already-downloaded data (avoids a 2nd big download)
-      slimMeshcore: () => state.data.meshcore && state.data.meshcore.filter(n => (n.typeId === 2 || n.typeId === 3) && n.key && Math.abs(n.lat) <= 85)
+      slimMeshcore: () => !state.stale.meshcore && state.data.meshcore && state.data.meshcore.filter(n => (n.typeId === 2 || n.typeId === 3) && n.key && Math.abs(n.lat) <= 85)
         .map(n => [n.key.slice(0, 16), n.name.slice(0, 40), n.typeId, +n.lat.toFixed(5), +n.lon.toFixed(5), n.heard || 0, slimRadio(n.params)])
     };
   })();
@@ -1713,10 +1871,13 @@
   }
   function start(map) {
     MAP = map;
-    detectOld().forEach(k => { off[k] = true; });
+    detectOld().forEach(k => { off[k] = true; if (k === 'nodes' && NODES.isActive()) NODES.disable(); });
     buildPanel();
     showConflict(Object.keys(off));
-    for (const k of Object.keys(MODS)) if (!off[k]) { try { MODS[k].init(map); } catch (e) { console.warn(TAG, 'init', k, e); } }
+    for (const k of Object.keys(MODS)) if (!off[k]) {
+      if (k === 'nodes' && NODES.isActive()) continue; // already started as soon as the map existed
+      try { MODS[k].init(map); } catch (e) { console.warn(TAG, 'init', k, e); }
+    }
     // an old script might start a little later than us: keep watching for 30 s
     let n = 0;
     const iv = setInterval(() => {
@@ -1729,7 +1890,11 @@
   }
   function waitForMap(t) {
     const m = findMap();
-    if (m) { const g = +W.__meshToolsGraceMs; return setTimeout(() => start(m), isFinite(g) && g >= 0 ? g : 1500); }
+    if (m) {
+      // Don't wait out the grace period before drawing nodes. The grace is for the rest of the panel.
+      try { if (!detectOld().includes('nodes') && !NODES.isActive()) NODES.init(m); } catch (e) { console.warn(TAG, 'early nodes', e); }
+      const g = +W.__meshToolsGraceMs; return setTimeout(() => start(m), isFinite(g) && g >= 0 ? g : 1500);
+    }
     if (t > 120) return console.warn(TAG, 'map not found');
     setTimeout(() => waitForMap(t + 1), 500);
   }
