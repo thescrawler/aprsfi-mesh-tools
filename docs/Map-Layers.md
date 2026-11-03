@@ -9,12 +9,29 @@ aprs.fi can get crowded. This tab lets you **hide** kinds of things on the map s
 | **Moving stations** | Cars, hikers, trackers, anything that moves |
 | **Fixed stations** | Home stations, digipeaters, iGates |
 | **Weather** | Weather stations |
-| **Objects** | APRS objects (nets, events, repeater objects…) |
+| **Objects** | Every APRS object. The rows under it hide one kind at a time (see below). |
 | **Items** | APRS items |
 | **AIS ships** | Ships from AIS |
 | **Aircraft (ADS-B)** | Aircraft |
 
-Next to the toggles, a counter shows how much is visible, e.g. **"812 of 1,240 map points showing"**. **Show all** and **Hide all** buttons switch every toggle (including the Advanced ones) at once.
+Next to the toggles, a counter shows how much is visible, e.g. **"812 of 1,240 map points showing"**. **Show all** and **Hide all** buttons switch every toggle (including object types and the Advanced ones) at once.
+
+## Object types
+
+Under **Objects**, six rows split APRS objects by the symbol aprs.fi already uses. Each row shows that symbol, and the **ⓘ** button explains it in plain language. Your choices are remembered.
+
+| Toggle | What it hides | Symbol it uses |
+|---|---|---|
+| **Repeaters & towers** | Digipeaters, repeater towers, gateways, nodes and antennas | Repeater tower |
+| **Weather & alerts** | Weather stations, storms, tornadoes, floods and similar warnings | Weather station |
+| **Events** | Camps, picnics and parks | Picnic / park |
+| **Emergency** | Police, fire, ambulance, hospitals and shelters | Emergency |
+| **Generic markers** | Plain dots, numbered circles and crosses | Red dot |
+| **Other objects** | Everything else (shops, ships, restrooms, and any symbol that does not fit above) | Question mark |
+
+**Objects** is the master switch. Turn it off and every object disappears, whatever the rows say. Turn it on, then untick one row to hide just that kind. The rows look faded while **Objects** is off, so you can see they are waiting.
+
+A real weather station, ship or home station is **not** an object. Those stay on **Weather**, **AIS ships** or **Fixed stations**, even when they use a similar picture. **Items** stay on the **Items** row.
 
 ## Advanced
 
@@ -34,3 +51,5 @@ Next to the toggles, a counter shows how much is visible, e.g. **"812 of 1,240 m
 - If an old *aprs.fi Map Layer Toggles* script is on, this tab stays off and aprs.fi shows everything as normal (see [Installation](Installation.md#step-3-turn-off-the-old-separate-scripts-if-you-had-them))
 - Mesh nodes and coverage shading are *not* affected by these toggles. Use the 📡 and 📶 tabs for those.
 - This tab works by reading aprs.fi's own internal map data. If aprs.fi changes how its map works, some toggles may stop working until Mesh Tools is updated. Please [report it](Troubleshooting.md#reporting-a-problem).
+- Object types follow aprs.fi's symbol table. A letter or number drawn on top of a symbol (an overlay) is grouped with the alternate-table symbol underneath, the same way aprs.fi names it. If an object has no symbol, it counts as **Other objects**.
+- Older positions along an object's track follow that object's type, and also the **Old positions** switch under Advanced.

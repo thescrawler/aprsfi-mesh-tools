@@ -1,5 +1,8 @@
 # 📝 Changelog
 
+## Nov 3, 2026: 1.3.0-beta
+- **Hide APRS objects by type.** aprs.fi only had one switch for every object. The Map layers tab now has six rows under **Objects**: Repeaters & towers, Weather & alerts, Events, Emergency, Generic markers, and Other objects. Each row shows the same symbol aprs.fi draws on the map, and the ⓘ button explains that kind in plain language. **Objects** still hides them all. Choices are remembered. Real stations, weather stations and ships are unchanged.
+
 ## Nov 3, 2026: 1.2.1-beta
 - **Fix: red dots stayed on the map after turning off Show MeshCore nodes.** The Coverage tab draws plain circles for MeshCore repeaters (red) and chat rooms (purple) when the ◆ markers are not on screen. Turning the switch off hid the red ◆R markers but left those circles, including when zoomed out around a town. The switch now hides and shows them too, at every zoom.
 

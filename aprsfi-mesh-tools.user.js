@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         aprs.fi Mesh Tools (beta)
 // @namespace    https://greasyfork.org/users/aprsfi-mesh-overlay
-// @version      1.2.1-beta
+// @version      1.3.0-beta
 // @description  One easy panel for aprs.fi: see MeshCore & Meshtastic radios on the map, check roughly where a repeater can reach, and hide map clutter. Bundles Mesh Overlay, Mesh Coverage and Map Layer Toggles.
 // @author       aprsfi-mesh-overlay contributors
 // @license      MIT
@@ -49,7 +49,7 @@
   const { Math, isFinite, Float32Array, Float64Array, Uint8Array, Uint16Array, Int16Array, Array, Map, Set, Promise, Object, Date, Number, JSON, Error } = globalThis;
   const performance = globalThis.performance || { now: () => Date.now() };
   const W = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : (typeof window !== 'undefined' ? window : globalThis);
-  const VERSION = '1.2.1-beta';
+  const VERSION = '1.3.0-beta';
   const TAG = '[mesh-tools]';
   const WIKI_URL = 'https://github.com/thescrawler/aprsfi-mesh-tools/blob/main/docs/Home.md'; // 📖 Help / Wiki link in Panel settings
 
@@ -1211,8 +1211,48 @@
       ['paths',    'Relay path lines (on hover)', 'overlays'],
       ['phg',      'Range circles (PHG)',      'overlays']
     ];
+    // APRS object groups, keyed from aprs.fi's symbol table (constants.js symbol_descr).
+    // Primary table is symbol "/X". Alternate "\X" and overlay symbols (A–Z or 0–9, then the symbol)
+    // use the alternate table, which is how aprs.fi itself describes them.
+    const OBJ_GROUPS = [
+      ['obj-radio', 'Repeaters & towers', '/r'],
+      ['obj-wx', 'Weather & alerts', '/_'],
+      ['obj-event', 'Events', '\\;'],
+      ['obj-emerg', 'Emergency', '\\!'],
+      ['obj-generic', 'Generic markers', '//'],
+      ['obj-other', 'Other objects', '\\.']
+    ];
+    const OBJ_PRI = {
+      '#': 'obj-radio', '%': 'obj-radio', '&': 'obj-radio', '-': 'obj-radio', 'B': 'obj-radio', 'I': 'obj-radio', 'N': 'obj-radio', '`': 'obj-radio', 'm': 'obj-radio', 'n': 'obj-radio', 'r': 'obj-radio', 'y': 'obj-radio',
+      'W': 'obj-wx', '_': 'obj-wx',
+      ';': 'obj-event', 'E': 'obj-event', 'w': 'obj-event',
+      '!': 'obj-emerg', '+': 'obj-emerg', ':': 'obj-emerg', 'A': 'obj-emerg', 'P': 'obj-emerg', 'a': 'obj-emerg', 'c': 'obj-emerg', 'd': 'obj-emerg', 'f': 'obj-emerg', 'h': 'obj-emerg', 'o': 'obj-emerg', 'z': 'obj-emerg',
+      '.': 'obj-generic', '/': 'obj-generic', '0': 'obj-generic', '1': 'obj-generic', '2': 'obj-generic', '3': 'obj-generic', '4': 'obj-generic', '5': 'obj-generic', '6': 'obj-generic', '7': 'obj-generic', '8': 'obj-generic', '9': 'obj-generic', '\\': 'obj-generic', 'G': 'obj-generic', 'q': 'obj-generic'
+    };
+    const OBJ_ALT = {
+      '#': 'obj-radio', '&': 'obj-radio', '0': 'obj-radio', '8': 'obj-radio', 'd': 'obj-radio',
+      '(': 'obj-wx', '*': 'obj-wx', ':': 'obj-wx', '<': 'obj-wx', '@': 'obj-wx', 'B': 'obj-wx', 'D': 'obj-wx', 'E': 'obj-wx', 'F': 'obj-wx', 'G': 'obj-wx', 'H': 'obj-wx', 'I': 'obj-wx', 'J': 'obj-wx', 'T': 'obj-wx', 'U': 'obj-wx', 'W': 'obj-wx', '[': 'obj-wx', '_': 'obj-wx', '`': 'obj-wx', 'b': 'obj-wx', 'e': 'obj-wx', 'f': 'obj-wx', 'g': 'obj-wx', 'p': 'obj-wx', 't': 'obj-wx', 'w': 'obj-wx', 'y': 'obj-wx', '{': 'obj-wx',
+      '+': 'obj-event', ';': 'obj-event',
+      '!': 'obj-emerg', "'": 'obj-emerg', 'Q': 'obj-emerg', 'c': 'obj-emerg', 'z': 'obj-emerg',
+      '.': 'obj-generic', '/': 'obj-generic', 'A': 'obj-generic', 'i': 'obj-generic', 'n': 'obj-generic', 'o': 'obj-generic'
+    };
+    function objectGroup(sym) {
+      if (!sym || sym.length < 2) return 'obj-other';
+      const map = sym.charAt(0) === '/' ? OBJ_PRI : OBJ_ALT;
+      return map[sym.charAt(1)] || 'obj-other';
+    }
+    // aprs.fi sprite: 16×6 cells, symbol index is ASCII code − 33. @2x sheet drawn at 18px.
+    function symStyle(sym) {
+      if (!sym || sym.length < 2) return '';
+      const code = sym.charCodeAt(1);
+      if (code < 33 || code > 126) return '';
+      const sheet = sym.charCodeAt(0) === 47 ? '0' : '1';
+      const idx = code - 33, cell = 18;
+      return `background-image:url('https://aprs.fi/s2/aprs-symbols-24-${sheet}@2x.png');background-position:-${(idx % 16) * cell}px -${((idx / 16) | 0) * cell}px`;
+    }
     const show = {};
     TOGGLES.forEach(([k]) => { show[k] = GM_getValue('lt_show_' + k, true) !== false; });
+    OBJ_GROUPS.forEach(([k]) => { show[k] = GM_getValue('lt_show_' + k, true) !== false; });
 
     const PATH_COLORS = ['#497cff', '#498341', '#ad4fff'];
     const HEADING_COLOR = '#0010ff';
@@ -1245,7 +1285,8 @@
           const pt = layer.Xkg;
           const latest = !info || !pt || pt.t_end === info.time;
           const k = stationKind(info, pt);
-          return latest ? [k] : [k, 'dots'];
+          const keys = k === 'object' ? ['object', objectGroup(info.symbol)] : [k];
+          return latest ? keys : keys.concat(['dots']);
         }
         const cn = (layer.options && layer.options.icon && layer.options.icon.options.className) || '';
         if (/(^|\s)nametip(\s|$)/.test(cn)) return ['labels'];  // owner resolved in fullPass
@@ -1341,16 +1382,26 @@
       map.eachLayer(l => { if (l.Xjf !== undefined) { total++; if (l._ltHidden) hidden++; } });
       countEl.textContent = total ? `${total - hidden} of ${total} map points showing` : '';
     }
-    const TIPS = { moving: 'Cars, hikers, anything that moves', fixed: 'Home stations, digipeaters, gateways', weather: 'Weather stations', object: 'Things placed on the map by someone (events, nets)',
+    const TIPS = { moving: 'Cars, hikers, anything that moves', fixed: 'Home stations, digipeaters, gateways', weather: 'Weather stations', object: 'All APRS objects. The list under this splits them by symbol.',
       item: 'Like objects', ais: 'Boats and ships', aircraft: 'Planes', labels: 'The name text next to each icon', tracks: 'Lines showing where something has travelled',
-      dots: 'Small dots along a track', heading: 'Lines showing where something is heading', paths: 'Lines that appear when you hover over a station', phg: 'Circles estimating a station\'s range' };
+      dots: 'Small dots along a track', heading: 'Lines showing where something is heading', paths: 'Lines that appear when you hover over a station', phg: 'Circles estimating a station\'s range',
+      'obj-radio': 'Repeater towers, digipeaters, gateways and antennas placed as objects',
+      'obj-wx': 'Weather stations and storm or flood warnings placed as objects',
+      'obj-event': 'Camps, picnics and other gatherings placed on the map',
+      'obj-emerg': 'Police, fire, medical, shelter and other emergency markers',
+      'obj-generic': 'Plain dots, numbered circles and other simple markers',
+      'obj-other': 'Objects whose symbol does not fit the groups above' };
     function sectionHtml() {
       const row = ([k, label]) => `<label title="${esc(TIPS[k] || '')}"><input type="checkbox" data-k="${k}"${show[k] ? ' checked' : ''}><span>${label}</span></label>`;
+      const objRows = OBJ_GROUPS.map(([k, label, sym]) =>
+        `<label title="${esc(TIPS[k] || '')}"><input type="checkbox" data-k="${k}"${show[k] ? ' checked' : ''}><span><i class="sym" style="${symStyle(sym)}"></i><b>${label}</b></span></label>`).join('');
+      const stations = TOGGLES.filter(t => t[2] === 'stations').map(t => row(t) + (t[0] === 'object'
+        ? `<div id="mt-obj-groups" class="obj-groups${show.object ? '' : ' dim'}">${objRows}<div class="hint">These only hide objects while <b>Objects</b> is on. The picture matches the map icon.</div></div>` : '')).join('');
       return `
         <div class="hint">Untick things to hide them and clean up the map. Nothing is deleted.</div>
         <div class="btns"><button type="button" id="lt-all">Show all</button><button type="button" id="lt-none">Hide all</button></div>
         <div class="sec">What to show</div>
-        ${TOGGLES.filter(t => t[2] === 'stations').map(row).join('')}
+        ${stations}
         <details class="adv"><summary>Advanced: lines, labels &amp; circles</summary>
         ${TOGGLES.filter(t => t[2] === 'overlays').map(row).join('')}
         </details>
@@ -1359,8 +1410,10 @@
     function wire() {
       const boxes = [...document.querySelectorAll('#mt-pane-layers input[data-k]')];
       const set = (k, v) => { show[k] = v; GM_setValue('lt_show_' + k, v); };
-      boxes.forEach(cb => cb.addEventListener('change', () => { set(cb.dataset.k, cb.checked); fullPass(); }));
-      const all = v => { boxes.forEach(cb => { cb.checked = v; set(cb.dataset.k, v); }); fullPass(); };
+      const grp = $id('mt-obj-groups');
+      const syncObj = () => { const ob = boxes.find(cb => cb.dataset.k === 'object'); if (grp && ob) grp.classList.toggle('dim', !ob.checked); };
+      boxes.forEach(cb => cb.addEventListener('change', () => { set(cb.dataset.k, cb.checked); if (cb.dataset.k === 'object') syncObj(); fullPass(); }));
+      const all = v => { boxes.forEach(cb => { cb.checked = v; set(cb.dataset.k, v); }); syncObj(); fullPass(); };
       $id('lt-all').addEventListener('click', () => all(true));
       $id('lt-none').addEventListener('click', () => all(false));
     }
@@ -1425,6 +1478,10 @@
     #mt-panel input[type=checkbox]:checked::before{transform:translateX(16px)}
     #mt-panel input[type=checkbox]:disabled{opacity:.5}
     #mt-panel .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin:0 6px 0 0;vertical-align:0;flex:none}
+    #mt-panel .sym{display:inline-block;width:18px;height:18px;margin:0 6px 0 0;vertical-align:-4px;background-repeat:no-repeat;background-size:288px 108px}
+    #mt-panel .obj-groups{margin:0 0 4px 22px;padding:0 0 2px 8px;border-left:2px solid #e6e9ee}
+    #mt-panel .obj-groups.dim{opacity:.45}
+    #mt-panel .obj-groups .hint{margin:2px 0 6px;font-size:12px}
     #mt-panel .mt-row{all:unset;display:grid!important;grid-template-columns:minmax(0,1fr) var(--mt-cw);align-items:center;column-gap:10px;
       box-sizing:border-box;width:100%;min-width:0;max-width:100%;min-height:var(--mt-h);margin:0!important;padding:4px 0!important;
       float:none;position:static;text-indent:0;font-size:14px;line-height:1.35;color:inherit;text-align:left}
@@ -1564,7 +1621,13 @@
     'lt:moving': 'Cars, hikers and anything else that moves and reports its position.',
     'lt:fixed': 'Stations that stay put: home stations, digipeaters and internet gateways.',
     'lt:weather': 'Weather stations that report temperature, wind and rain.',
-    'lt:object': 'Things someone placed on the map, such as events or nets. They are not real radios.',
+    'lt:object': 'Things someone placed on the map, such as a net or a repeater object. They are not moving radios. Turn this off to hide every object. The rows under it hide one kind at a time.',
+    'lt:obj-radio': 'Repeater towers, digipeaters, internet gateways and antenna sites that were placed on the map as objects.',
+    'lt:obj-wx': 'Weather stations, plus storm, tornado, flood and other weather warnings placed as objects.',
+    'lt:obj-event': 'Camps, picnics, parks and other gatherings someone put on the map.',
+    'lt:obj-emerg': 'Police, fire, ambulance, hospital, shelter and other emergency markers.',
+    'lt:obj-generic': 'Plain dots, numbered circles, crosses and other simple markers with no special picture.',
+    'lt:obj-other': 'Objects whose symbol does not fit the groups above, such as shops, ships or restrooms.',
     'lt:item': 'Like objects: markers placed on the map by someone, not radios.',
     'lt:ais': 'Boats and ships reporting their position over AIS.',
     'lt:aircraft': 'Planes reporting their position over ADS-B.',

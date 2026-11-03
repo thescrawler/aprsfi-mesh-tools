@@ -75,6 +75,13 @@ The chosen Terrain detail would need more than 480 terrain tiles at this distanc
 
 Map layers depend on aprs.fi's internal map code. If aprs.fi changed it, please report it (below). Turning toggles back on, or reloading, always restores the map.
 
+## An object is still showing after I hid its type
+
+- **Objects** (the row above the pictures) must be on for the type rows to do anything. If it is off, every object is hidden.
+- The type rows only affect **APRS objects**, things someone placed on the map. A home station or weather station that uses a similar icon stays on its own row (**Fixed stations**, **Weather**, and so on).
+- A symbol with a letter or number on top is grouped with the alternate symbol underneath. A repeater tower is the plain tower symbol. The same picture with a letter on it may be a different kind of object, and can land in **Other objects**.
+- Update to **1.3.0-beta** or newer if the type rows are missing.
+
 ## The panel covers something I need
 
 Drag the **⠿ drag to move** bar, or tap the header to collapse the panel. Double-tap the bar to send it back to the corner.
