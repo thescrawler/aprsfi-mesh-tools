@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         aprs.fi Mesh Tools (beta)
 // @namespace    https://greasyfork.org/users/aprsfi-mesh-overlay
-// @version      1.3.1-beta
+// @version      1.4.0-beta
 // @description  One easy panel for aprs.fi: see MeshCore & Meshtastic radios on the map, check roughly where a repeater can reach, and hide map clutter. Bundles Mesh Overlay, Mesh Coverage and Map Layer Toggles.
 // @author       aprsfi-mesh-overlay contributors
 // @license      MIT
@@ -50,7 +50,7 @@
   const performance = globalThis.performance || { now: () => Date.now() };
   const BOOTED = performance.now();
   const W = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : (typeof window !== 'undefined' ? window : globalThis);
-  const VERSION = '1.3.1-beta';
+  const VERSION = '1.4.0-beta';
   const TAG = '[mesh-tools]';
   const WIKI_URL = 'https://github.com/thescrawler/aprsfi-mesh-tools/blob/main/docs/Home.md'; // 📖 Help / Wiki link in Panel settings
 
@@ -313,6 +313,18 @@
     CFG.maxMarkersPerLayer = pick(GM_getValue('max_markers', CFG.maxMarkersPerLayer), MAX_OPTS, CFG.maxMarkersPerLayer);
     const MC_TYPES = { 1: 'Companion', 2: 'Repeater', 3: 'Room Server', 4: 'Sensor' };
     const MC_COLORS = { 1: '#1e88e5', 2: '#e53935', 3: '#8e24aa', 4: '#00897b' };
+    // type field from map.meshcore.io. 0 is the catch-all for anything that is not 1–4.
+    const MC_TYPE_ROWS = [
+      [2, 'Repeaters', 'R'],
+      [1, 'Companions', 'C'],
+      [3, 'Room servers', 'S'],
+      [4, 'Sensors', 's'],
+      [0, 'Other / unknown', '?']
+    ];
+    const showType = {};
+    for (const [id] of MC_TYPE_ROWS) showType[id] = GM_getValue('show_mc_type_' + id, true) !== false;
+    const mcTypeBucket = t => (t === 1 || t === 2 || t === 3 || t === 4) ? t : 0;
+    const mcTypeOn = t => !!showType[mcTypeBucket(t)];
     const MT_COLOR = '#43a047';
     const NAMES = { meshcore: 'MeshCore nodes', meshtastic: 'Meshtastic nodes' };
     const state = {
@@ -516,6 +528,7 @@
       const seen = new Set();
       let vis = [];
       for (const n of nodes) {
+        if (src === 'meshcore' && !mcTypeOn(n.typeId)) continue;
         if (n.heard && n.heard < cutoff) continue;
         if (n.lat < south || n.lat > north) continue;
         if (!wrap) { if (n.lon < west || n.lon > east) continue; }
@@ -582,8 +595,11 @@
     function sectionHtml() {
       return `
         <label title="MeshCore radios reported to map.meshcore.io"><input type="checkbox" id="mo-cb-meshcore"><span><b>Show MeshCore nodes</b>
-          <small><span style="color:#e53935">◆R</span> repeater (passes messages on) · <span style="color:#1e88e5">◆C</span> someone's radio · <span style="color:#8e24aa">◆S</span> chat room</small>
           <small class="stl" id="mo-st-meshcore"></small></span></label>
+        <div id="mt-mc-types" class="obj-groups${state.show.meshcore ? '' : ' dim'}">${MC_TYPE_ROWS.map(([id, name, letter]) => {
+          const c = MC_COLORS[id] || '#555';
+          return `<label><input type="checkbox" id="mo-type-${id}"${showType[id] ? ' checked' : ''}><span><i class="mcico" style="background:${c}"><span>${letter}</span></i><b>${name}</b></span></label>`;
+        }).join('')}<div class="hint">These only apply while <b>Show MeshCore nodes</b> is on. The picture matches the map icon.</div></div>
         <label title="Meshtastic radios reported to meshmap.net"><input type="checkbox" id="mo-cb-meshtastic"><span><b>Show Meshtastic nodes</b> <span style="color:${MT_COLOR}">●M</span>
           <small>Only ones connected to the internet show up.</small><small class="stl" id="mo-st-meshtastic"></small></span></label>
         <div id="mo-err" class="card err" style="display:none"><span class="msg"></span><button type="button" id="mo-retry">↻ Retry</button></div>
@@ -601,9 +617,19 @@
         cb.addEventListener('change', () => {
           state.show[src] = cb.checked; GM_setValue('show_' + src, cb.checked); refresh();
           // Coverage's plain repeater/room circles follow this switch too, including zoomed out.
-          if (src === 'meshcore') { try { if (COVERAGE.isActive()) COVERAGE.refresh(); } catch (e) { /* */ } }
+          if (src === 'meshcore') { syncMcTypes(); try { if (COVERAGE.isActive()) COVERAGE.refresh(); } catch (e) { /* */ } }
         });
       }
+      const syncMcTypes = () => { const box = $id('mt-mc-types'), ob = $id('mo-cb-meshcore'); if (box && ob) box.classList.toggle('dim', !ob.checked); };
+      for (const [id] of MC_TYPE_ROWS) {
+        const cb = $id('mo-type-' + id);
+        cb.addEventListener('change', () => {
+          showType[id] = cb.checked; GM_setValue('show_mc_type_' + id, cb.checked);
+          draw('meshcore'); // already in memory: no download
+          try { if (COVERAGE.isActive()) COVERAGE.refresh(); } catch (e) { /* */ }
+        });
+      }
+      syncMcTypes();
       $id('mo-reload').addEventListener('click', () => refresh(true));
       $id('mo-retry').addEventListener('click', () => { state.error.meshcore = state.error.meshtastic = ''; showError(); refresh(true); });
       $id('mo-age').addEventListener('change', e => { CFG.maxAgeDays = pick(e.target.value, AGE_OPTS, 30); GM_setValue('max_age_days', CFG.maxAgeDays); refresh(); });
@@ -633,6 +659,8 @@
       showsMeshcore: () => state.active && !!state.show.meshcore && !!state.map && state.map.getZoom() >= CFG.minZoom,
       // toggle only, ignoring zoom: coverage's plain dots must follow the switch even when zoomed out
       meshcoreWanted: () => !!state.show.meshcore,
+      // per-type switch, ignoring zoom. Unknown type numbers share the Other row.
+      meshcoreTypeOn: mcTypeOn,
       // slim repeater/room list for Coverage, derived from already-downloaded data (avoids a 2nd big download)
       slimMeshcore: () => !state.stale.meshcore && state.data.meshcore && state.data.meshcore.filter(n => (n.typeId === 2 || n.typeId === 3) && n.key && Math.abs(n.lat) <= 85)
         .map(n => [n.key.slice(0, 16), n.name.slice(0, 40), n.typeId, +n.lat.toFixed(5), +n.lon.toFixed(5), n.heard || 0, slimRadio(n.params)])
@@ -1085,7 +1113,10 @@
       if (hidden || overlayActive()) return; // overlay markers carry our controls via popupopen injection
       let n = 0;
       for (const v of vis) {
-        if (drawnIds.has(v[0])) continue; if (++n > MARK_MAX) break;
+        if (drawnIds.has(v[0])) continue;
+        // Repeaters / Room servers rows also hide these fallback circles. Master off is handled above.
+        if (NODES.isActive() && NODES.meshcoreWanted() && !NODES.meshcoreTypeOn(v[2])) continue;
+        if (++n > MARK_MAX) break;
         if (keep && keep._cvId === v[0]) continue;
         const site = nodeSite(v[0], v[1], v[2], v[3], v[4], v[5], v[6]);
         const cm = L.circleMarker([site.lat, site.lon], { radius: 6, color: '#000', weight: 1, fillColor: rgb(site.col), fillOpacity: 0.85,
@@ -1154,7 +1185,8 @@
       for (const [id, v] of Object.entries(st.sel)) out.push(nodeSite(id, v.n, v.k, v.lat, v.lon, v.l, v.r)); // always, ignores cap/view
       if (st.map.getZoom() < CFG.minZoom || !st.nodes) return out;
       const b = st.map.getBounds().pad(0.2), c = st.map.getCenter(), cut = Date.now() - S.age * 86400e3;
-      const vis = st.nodes.filter(n => ((n[2] === 2 && S.showRep) || (n[2] === 3 && S.showRoom)) && n[5] >= cut && b.contains([n[3], n[4]]));
+      const vis = st.nodes.filter(n => ((n[2] === 2 && S.showRep) || (n[2] === 3 && S.showRoom)) && n[5] >= cut && b.contains([n[3], n[4]])
+        && (!NODES.isActive() || !NODES.meshcoreWanted() || NODES.meshcoreTypeOn(n[2])));
       vis.sort((a, z) => ((a[3] - c.lat) ** 2 + (a[4] - c.lng) ** 2) - ((z[3] - c.lat) ** 2 + (z[4] - c.lng) ** 2));
       st.vis = vis;
       if (S.allRep) {
@@ -1640,6 +1672,8 @@
     #mt-panel .obj-groups{margin:0 0 4px 22px;padding:0 0 2px 8px;border-left:2px solid #e6e9ee}
     #mt-panel .obj-groups.dim{opacity:.45}
     #mt-panel .obj-groups .hint{margin:2px 0 6px;font-size:12px}
+    #mt-panel .mcico{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;margin:0 6px 0 0;vertical-align:-3px;border:2px solid #fff;box-shadow:0 0 2px #000;transform:rotate(45deg);flex:none}
+    #mt-panel .mcico span{transform:rotate(-45deg);color:#fff;font:bold 9px/1 sans-serif}
     #mt-panel .mt-row{all:unset;display:grid!important;grid-template-columns:minmax(0,1fr) var(--mt-cw);align-items:center;column-gap:10px;
       box-sizing:border-box;width:100%;min-width:0;max-width:100%;min-height:var(--mt-h);margin:0!important;padding:4px 0!important;
       float:none;position:static;text-indent:0;font-size:14px;line-height:1.35;color:inherit;text-align:left}
@@ -1750,7 +1784,12 @@
 
   // --- ⓘ info buttons: plain-English help under each setting (tap to open, tap again/elsewhere to close) ---
   const INFO = {
-    'mo-cb-meshcore': 'Shows MeshCore radios that have reported to map.meshcore.io. Red ◆R are repeaters that pass messages along. Also shows or hides the plain round repeater and chat-room dots, including when you are zoomed out.',
+    'mo-cb-meshcore': 'Shows or hides every MeshCore radio from map.meshcore.io. Off hides the diamonds and the plain repeater and chat-room dots, at every zoom. The rows under it hide one kind at a time.',
+    'mo-type-2': 'Repeaters pass messages along and extend the mesh. They are the red ◆R diamonds. Hiding them also hides the plain red repeater dots.',
+    'mo-type-1': 'Companions are someone\'s own radio, usually paired with a phone. They are the blue ◆C diamonds. These are the chat nodes.',
+    'mo-type-3': 'Room servers are chat rooms that store messages. They are the purple ◆S diamonds. Hiding them also hides the plain purple room dots.',
+    'mo-type-4': 'Sensors report a reading, such as temperature. They are the teal ◆s diamonds.',
+    'mo-type-0': 'Any MeshCore radio whose type is not a repeater, companion, room server, or sensor. Shown as a grey ◆?.',
     'mo-cb-meshtastic': 'Shows Meshtastic radios from meshmap.net. Only radios connected to the internet appear.',
     'mo-age': 'Hides nodes that have not been heard from in this many days, so old or switched-off radios disappear.',
     'mo-max': 'The most nodes drawn at once. Lower this if the map feels slow on your phone.',

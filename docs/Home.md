@@ -13,11 +13,11 @@ Tap **Install**. (On a computer you can also just click the one-click install li
 
 | Tab | What it does |
 |---|---|
-| 📡 **Mesh nodes** | Shows MeshCore and Meshtastic radios on the aprs.fi map, alongside the normal APRS stations. |
+| 📡 **Mesh nodes** | Shows MeshCore and Meshtastic radios on the aprs.fi map, alongside the normal APRS stations. MeshCore can be limited to repeaters, companions, room servers, or sensors. |
 | 📶 **Coverage** | Shades roughly where a MeshCore repeater (or a spot you choose) can reach over the hills. |
 | 🗺️ **Map layers** | Hides clutter on the aprs.fi map, such as ships, planes, track lines, labels, or APRS objects by type (repeaters, weather, events, and so on). Nothing is deleted. |
 
-Current version: **1.3.1-beta**. It runs in your web browser through the free **Tampermonkey** extension. It only runs on `aprs.fi` pages.
+Current version: **1.4.0-beta**. It runs in your web browser through the free **Tampermonkey** extension. It only runs on `aprs.fi` pages.
 
 > **Beta software.** Coverage is an *estimate* from hills only. It does not include trees, buildings, or your radio's power and antenna gain. Read [How the coverage estimate works](Coverage.md#how-the-estimate-works) before relying on it.
 

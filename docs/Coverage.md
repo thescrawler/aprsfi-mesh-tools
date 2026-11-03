@@ -15,7 +15,7 @@ The Coverage tab shades the area a **MeshCore repeater** (or any spot you choose
 5. To compare repeaters, tap more of them and tap **Show coverage** on each. Each one gets its own colour (8 colours rotate).
 6. To test a spot with no repeater, open the Coverage tab and tap **📍 Drop a pin to test a spot**, then tap the map. Pins are **orange**.
 
-If the 📡 Mesh nodes tab is showing MeshCore nodes, the coverage controls appear inside the normal ◆ popups. The Coverage tab also draws its own small round markers for repeaters (red) and room servers (purple) when those ◆ markers are not on the map. From **1.2.1-beta**, **Show MeshCore nodes** hides those dots too, including when you are zoomed out. Turn the switch back on to tap a repeater, or use **Drop a pin**. A repeater you already chose with **Show coverage**, and any pin, stays on the map.
+If the 📡 Mesh nodes tab is showing MeshCore nodes, the coverage controls appear inside the normal ◆ popups. The Coverage tab also draws its own small round markers for repeaters (red) and room servers (purple) when those ◆ markers are not on the map. **Show MeshCore nodes** hides those dots too, including when you are zoomed out. **Repeaters** and **Room servers** under that switch hide the matching dots on their own. Turn the switch back on to tap a repeater, or use **Drop a pin**. A repeater you already chose with **Show coverage**, and any pin, stays on the map.
 
 ---
 
@@ -55,7 +55,7 @@ All settings are remembered. Changing any setting marked ♻️ throws away what
 Default **off**. When on, coverage is drawn automatically for the **nearest 25** repeaters/room servers around the middle of the map, as well as anything you picked. It updates as you move the map, and the status says e.g. *Showing 25 (nearest 25 of 140)*. On phones this can take a long time and use a lot of data, especially with high Terrain detail.
 
 ### Include repeaters / Include chat rooms
-Both default **on**. These choose which kinds of MeshCore nodes count as "nearby" for *Show ALL* and for the Coverage tab's own round markers. Those round markers follow **Show MeshCore nodes** on the Mesh nodes tab: off hides the red repeater dots and the purple room dots at every zoom. Chat rooms are room servers (◆S). Repeaters or rooms you picked by hand are always shown.
+Both default **on**. These choose which kinds of MeshCore nodes count as "nearby" for *Show ALL* and for the Coverage tab's own round markers. Those round markers also follow **Show MeshCore nodes**, and the **Repeaters** and **Room servers** rows under it: off hides the matching dots at every zoom. Chat rooms are room servers (◆S). Repeaters or rooms you picked by hand are always shown.
 
 ### Heard in the last
 **7, 30 (default), 90 days.** Repeaters not heard from in this many days are ignored when finding "nearby" ones, so dead repeaters are skipped. This is separate from the Mesh nodes tab's own *Heard from in the last* setting.

@@ -32,7 +32,7 @@ Those plain red circles are repeater dots drawn by the Coverage tab (purple ones
 ## No mesh nodes on the map
 
 - **Zoom in.** Nodes only show at map zoom 6 or closer.
-- **Check the switches** *Show MeshCore nodes* / *Show Meshtastic nodes*.
+- **Check the switches** *Show MeshCore nodes* / *Show Meshtastic nodes*. Under MeshCore, **Repeaters**, **Companions**, **Room servers**, or **Sensors** may be off on their own.
 - **Raise "Heard from in the last"** (Advanced) to 30 or 90 days. Quiet nodes may be filtered out.
 - **First visit is slower than the next one.** The MeshCore list is a large download the first time. From **1.3.1-beta**, later visits draw the saved list immediately. If nodes are still missing, wait for the status line to leave *Loading…*, or tap **⟳ Download fresh node lists**.
 - **Meshtastic:** only internet/MQTT-connected nodes are on meshmap.net. Many real radios won't appear.

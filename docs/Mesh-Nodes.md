@@ -14,6 +14,7 @@ Nodes only appear once you're **zoomed in to zoom level 6 or closer** (roughly a
 | ◆**C** | blue | **Companion**: someone's personal radio (usually paired with a phone) |
 | ◆**S** | purple | **Room server**: a chat room that stores messages |
 | ◆**s** | teal | **Sensor** |
+| ◆**?** | grey | **Other / unknown**: a type this list does not name |
 
 ### Meshtastic (green dots ●M)
 
@@ -34,7 +35,12 @@ Hover over a marker (desktop) to see a small label such as *"MeshCore Repeater: 
 
 | Setting | Options (default **bold**) | What it does |
 |---|---|---|
-| **Show MeshCore nodes** | **On** / off | Shows or hides MeshCore radios from map.meshcore.io, both the ◆ markers and the plain round dots the Coverage tab draws for repeaters (red) and chat rooms (purple). Hiding works zoomed in or zoomed out. The line under it explains the symbols and shows a status, e.g. *"42 here"*, *"400 nearest of 913 here"*, *"None here"*, *"Hidden"*. |
+| **Show MeshCore nodes** | **On** / off | Shows or hides every MeshCore radio from map.meshcore.io, both the ◆ markers and the plain round dots the Coverage tab draws for repeaters and chat rooms. Off hides them all, zoomed in or zoomed out. The status line says e.g. *"42 here"*, *"400 nearest of 913 here"*, *"None here"*, *"Hidden"*. |
+| **Repeaters** | **On** / off | Red ◆R. Radios that pass messages along. Also hides the plain red repeater dots. Only applies while **Show MeshCore nodes** is on. |
+| **Companions** | **On** / off | Blue ◆C. Someone's own radio, usually the chat node paired with a phone. |
+| **Room servers** | **On** / off | Purple ◆S. Chat rooms that store messages. Also hides the plain purple room dots. |
+| **Sensors** | **On** / off | Teal ◆s. Radios that report a sensor reading. |
+| **Other / unknown** | **On** / off | Grey ◆?. Any MeshCore type that is not one of the four above. |
 | **Show Meshtastic nodes** | **On** / off | Shows or hides Meshtastic radios from meshmap.net. |
 | **Heard from in the last** *(Advanced)* | 1, 7, **30**, 90 days | Hides nodes not heard from in this many days, so old or switched-off radios disappear. Nodes with no "last heard" time are always shown. |
 | **Most nodes to draw** *(Advanced)* | 100, **400**, 1000 | The most markers drawn **per network** (MeshCore and Meshtastic separately). If more are in view, the ones **nearest the centre of the map** are drawn. Lower this if the map feels slow on your phone. |
