@@ -1,5 +1,8 @@
 # 📝 Changelog
 
+## Nov 3, 2026: 1.2.1-beta
+- **Fix: red dots stayed on the map after turning off Show MeshCore nodes.** The Coverage tab draws plain circles for MeshCore repeaters (red) and chat rooms (purple) when the ◆ markers are not on screen. Turning the switch off hid the red ◆R markers but left those circles, including when zoomed out around a town. The switch now hides and shows them too, at every zoom.
+
 ## Nov 2, 2026: docs
 - Easier install on phones: copy-paste link for Tampermonkey Import from URL at the top of the README and guide.
 

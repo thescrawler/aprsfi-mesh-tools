@@ -25,6 +25,10 @@ An older separate script is still running. Turn it off in the Tampermonkey Dashb
 
 If you accidentally installed Mesh Tools twice, only the first copy runs. Delete the duplicate in the Dashboard.
 
+## I turned off MeshCore, but red dots are still on the map
+
+Those plain red circles are repeater dots drawn by the Coverage tab (purple ones are chat rooms), not the ◆R markers. Update to **1.2.1-beta** or newer and reload aprs.fi. **Show MeshCore nodes** then hides them too, including when you are zoomed out. A repeater you already tapped **Show coverage** on, and any pin you dropped, stays put.
+
 ## No mesh nodes on the map
 
 - **Zoom in.** Nodes only show at map zoom 6 or closer.

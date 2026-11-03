@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         aprs.fi Mesh Tools (beta)
 // @namespace    https://greasyfork.org/users/aprsfi-mesh-overlay
-// @version      1.2.0-beta
+// @version      1.2.1-beta
 // @description  One easy panel for aprs.fi: see MeshCore & Meshtastic radios on the map, check roughly where a repeater can reach, and hide map clutter. Bundles Mesh Overlay, Mesh Coverage and Map Layer Toggles.
 // @author       aprsfi-mesh-overlay contributors
 // @license      MIT
@@ -49,7 +49,7 @@
   const { Math, isFinite, Float32Array, Float64Array, Uint8Array, Uint16Array, Int16Array, Array, Map, Set, Promise, Object, Date, Number, JSON, Error } = globalThis;
   const performance = globalThis.performance || { now: () => Date.now() };
   const W = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : (typeof window !== 'undefined' ? window : globalThis);
-  const VERSION = '1.2.0-beta';
+  const VERSION = '1.2.1-beta';
   const TAG = '[mesh-tools]';
   const WIKI_URL = 'https://github.com/thescrawler/aprsfi-mesh-tools/blob/main/docs/Home.md'; // 📖 Help / Wiki link in Panel settings
 
@@ -445,7 +445,11 @@
       for (const src of ['meshcore', 'meshtastic']) {
         const cb = $id('mo-cb-' + src);
         cb.checked = state.show[src];
-        cb.addEventListener('change', () => { state.show[src] = cb.checked; GM_setValue('show_' + src, cb.checked); refresh(); });
+        cb.addEventListener('change', () => {
+          state.show[src] = cb.checked; GM_setValue('show_' + src, cb.checked); refresh();
+          // Coverage's plain repeater/room circles follow this switch too, including zoomed out.
+          if (src === 'meshcore') { try { if (COVERAGE.isActive()) COVERAGE.refresh(); } catch (e) { /* */ } }
+        });
       }
       $id('mo-reload').addEventListener('click', () => refresh(true));
       $id('mo-retry').addEventListener('click', () => { state.error.meshcore = state.error.meshtastic = ''; showError(); refresh(true); });
@@ -469,6 +473,8 @@
       isActive: () => state.active,
       isBusy: () => state.loading.meshcore || state.loading.meshtastic,
       showsMeshcore: () => state.active && !!state.show.meshcore && !!state.map && state.map.getZoom() >= CFG.minZoom,
+      // toggle only, ignoring zoom: coverage's plain dots must follow the switch even when zoomed out
+      meshcoreWanted: () => !!state.show.meshcore,
       // slim repeater/room list for Coverage, derived from already-downloaded data (avoids a 2nd big download)
       slimMeshcore: () => state.data.meshcore && state.data.meshcore.filter(n => (n.typeId === 2 || n.typeId === 3) && n.key && Math.abs(n.lat) <= 85)
         .map(n => [n.key.slice(0, 16), n.name.slice(0, 40), n.typeId, +n.lat.toFixed(5), +n.lon.toFixed(5), n.heard || 0, slimRadio(n.params)])
@@ -910,9 +916,15 @@
     function drawMarkers(vis, drawnIds) {
       const L = st.L;
       if (!st.marks) st.marks = L.layerGroup().addTo(st.map);
-      const pp = st.map._popup, keep = pp && pp.isOpen && pp.isOpen() && pp._source && st.marks.hasLayer(pp._source) ? pp._source : null;
+      // 1.2.1: these are plain circles (red = repeater, purple = room). They were drawn whenever the ◆
+      // markers were not on the map, so turning Show MeshCore nodes off — or zooming out — left the red
+      // dots behind. The switch now hides and shows them at every zoom.
+      const hidden = NODES.isActive() && !NODES.meshcoreWanted();
+      const pp = st.map._popup;
+      if (hidden && pp && pp.isOpen && pp.isOpen() && pp._source && st.marks.hasLayer(pp._source)) st.map.closePopup();
+      const keep = !hidden && pp && pp.isOpen && pp.isOpen() && pp._source && st.marks.hasLayer(pp._source) ? pp._source : null;
       st.marks.eachLayer(l => { if (l !== keep) st.marks.removeLayer(l); }); // 1.1.3: don't close an open popup on redraw
-      if (overlayActive()) return; // overlay markers carry our controls via popupopen injection
+      if (hidden || overlayActive()) return; // overlay markers carry our controls via popupopen injection
       let n = 0;
       for (const v of vis) {
         if (drawnIds.has(v[0])) continue; if (++n > MARK_MAX) break;
@@ -995,6 +1007,8 @@
     }
     async function refresh(force) {
       if (!state.active) return;
+      // Drop the plain repeater/room dots immediately when Show MeshCore nodes is off, before any download.
+      if (NODES.isActive() && !NODES.meshcoreWanted()) drawMarkers([], new Set());
       if (S.enabled && st.map.getZoom() >= CFG.minZoom) await ensureNodes(force);
       const want = wantedSites(), ids = new Set(want.map(layerKey));
       st.wantKeys = new Set(want.map(siteKey)); st.want = want;
@@ -1172,7 +1186,7 @@
       for (const l of Object.values(st.layers)) map.removeLayer(l.ov); st.layers = {};
       if (st.marks) { map.removeLayer(st.marks); st.marks = null; }
     }
-    return { sectionHtml, wire, init, disable, isActive: () => state.active, isBusy: () => st.loading || st.busy,
+    return { sectionHtml, wire, init, disable, refresh, isActive: () => state.active, isBusy: () => st.loading || st.busy,
       _detail: { DETAIL, effZoom, stepForZ, tileRange, tileUrl, siteZ, siteKey, get: () => S.detail },
       _perf: { missingTiles, tileCached, layers: () => Object.values(st.layers).map(l => ({ pv: l.pv })), busy: () => st.busy, viaGM: () => useGM, via: () => computeSite.via },
       _units: { parseH, toU, fromU, fmtH, setUnit, unit: () => UNIT, S, toD, fromD, fmtD, setDUnit, dunit: () => DUNIT, rangeOpts } };
@@ -1521,7 +1535,7 @@
 
   // --- ⓘ info buttons: plain-English help under each setting (tap to open, tap again/elsewhere to close) ---
   const INFO = {
-    'mo-cb-meshcore': 'Shows MeshCore radios that have reported to map.meshcore.io. Red ◆R are repeaters that pass messages along.',
+    'mo-cb-meshcore': 'Shows MeshCore radios that have reported to map.meshcore.io. Red ◆R are repeaters that pass messages along. Also shows or hides the plain round repeater and chat-room dots, including when you are zoomed out.',
     'mo-cb-meshtastic': 'Shows Meshtastic radios from meshmap.net. Only radios connected to the internet appear.',
     'mo-age': 'Hides nodes that have not been heard from in this many days, so old or switched-off radios disappear.',
     'mo-max': 'The most nodes drawn at once. Lower this if the map feels slow on your phone.',

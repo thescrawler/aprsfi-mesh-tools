@@ -34,7 +34,7 @@ Hover over a marker (desktop) to see a small label such as *"MeshCore Repeater: 
 
 | Setting | Options (default **bold**) | What it does |
 |---|---|---|
-| **Show MeshCore nodes** | **On** / off | Shows or hides MeshCore radios from map.meshcore.io. The line under it explains the symbols and shows a status, e.g. *"42 here"*, *"400 nearest of 913 here"*, *"None here"*, *"Hidden"*. |
+| **Show MeshCore nodes** | **On** / off | Shows or hides MeshCore radios from map.meshcore.io, both the ◆ markers and the plain round dots the Coverage tab draws for repeaters (red) and chat rooms (purple). Hiding works zoomed in or zoomed out. The line under it explains the symbols and shows a status, e.g. *"42 here"*, *"400 nearest of 913 here"*, *"None here"*, *"Hidden"*. |
 | **Show Meshtastic nodes** | **On** / off | Shows or hides Meshtastic radios from meshmap.net. |
 | **Heard from in the last** *(Advanced)* | 1, 7, **30**, 90 days | Hides nodes not heard from in this many days, so old or switched-off radios disappear. Nodes with no "last heard" time are always shown. |
 | **Most nodes to draw** *(Advanced)* | 100, **400**, 1000 | The most markers drawn **per network** (MeshCore and Meshtastic separately). If more are in view, the ones **nearest the centre of the map** are drawn. Lower this if the map feels slow on your phone. |
