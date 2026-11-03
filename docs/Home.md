@@ -1,5 +1,14 @@
 # aprs.fi Mesh Tools
 
+## 📲 Install (easiest way, works on phones)
+In Tampermonkey, open the menu, choose **Utilities**, then **Import from URL**, and paste this link:
+
+```
+https://raw.githubusercontent.com/thescrawler/aprsfi-mesh-tools/main/aprsfi-mesh-tools.user.js
+```
+
+Tap **Install**. (On a computer you can also just click the one-click install link below.)
+
 **aprs.fi Mesh Tools** is a free add-on (a *userscript*) for the [aprs.fi](https://aprs.fi) map. It adds one small panel to the map with three tools:
 
 | Tab | What it does |
@@ -8,7 +17,7 @@
 | 📶 **Coverage** | Shades roughly where a MeshCore repeater (or a spot you choose) can reach over the hills. |
 | 🗺️ **Map layers** | Hides clutter on the aprs.fi map, such as ships, planes, track lines or labels. Nothing is deleted. |
 
-Current version: **1.0.7-beta**. It runs in your web browser through the free **Tampermonkey** extension. It only runs on `aprs.fi` pages.
+Current version: **1.2.0-beta**. It runs in your web browser through the free **Tampermonkey** extension. It only runs on `aprs.fi` pages.
 
 > **Beta software.** Coverage is an *estimate* from hills only. It does not include trees, buildings, or your radio's power and antenna gain. Read [How the coverage estimate works](Coverage.md#how-the-estimate-works) before relying on it.
 

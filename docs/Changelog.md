@@ -1,5 +1,8 @@
 # 📝 Changelog
 
+## Nov 2, 2026: docs
+- Easier install on phones: copy-paste link for Tampermonkey Import from URL at the top of the README and guide.
+
 ## Nov 2, 2026: 1.2.0-beta
 - **More realistic Signal strength maps for low antennas on flat ground.** Over open, flat land, part of the signal bounces off the ground and partly cancels itself out, so a short mast doesn't reach as far as the old map suggested. The ground-bounce loss now blends in smoothly with distance, and antenna heights are measured above the ground along each path, so hilltop and mountain sites (like Pine Observatory) still get credit for their height. Hills still block as before.
 - **New setting: Fade margin (dB)** under Advanced, default **10**. It's a safety cushion: the map only counts a spot as covered if the signal is this much stronger than the bare minimum, because real signals come and go. Lower = more area but more dropouts, higher = only dependable spots. See *Fade margin (dB)* on the [Coverage](Coverage.md) page.
