@@ -26,7 +26,7 @@ On a computer you can also use the one-click link in [Installation](Installation
 | 📶 **Coverage** | Shades roughly where a MeshCore repeater (or a spot you choose) can reach over the hills. |
 | 🗺️ **Map layers** | Hides clutter on the aprs.fi map, such as ships, planes, track lines, labels, or APRS objects by type. Also Winlink GPS reports and, if you turn it on, FT8 spots. Nothing on aprs.fi is deleted. |
 
-Current version: **1.6.1-beta**. It runs in your web browser through the free **Tampermonkey** extension. It only runs on `aprs.fi` pages.
+Current version: **1.6.2-beta**. It runs in your web browser through the free **Tampermonkey** extension. It only runs on `aprs.fi` pages.
 
 > **Beta software.** Coverage is an *estimate* from hills only. It does not include trees, buildings, or your radio's power and antenna gain. Read [How the coverage estimate works](Coverage.md#how-the-estimate-works) before relying on it.
 

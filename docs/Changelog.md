@@ -1,5 +1,8 @@
 # 📝 Changelog
 
+## Nov 4, 2026: 1.6.2-beta
+- **Fetch FT8 now.** The button loads FT8 spots for the 2-letter Maidenhead fields covering the map (PSKReporter `modify=grid`, mode FT8, last 15 minutes). If the view spans more than 4 fields, it fetches the 4 nearest the center and says so. Fields are requested one after another. The button then waits 5 minutes and shows **Cached, refresh available in Xm**. The quiet background check is still only the square at the middle of the map.
+
 ## Nov 4, 2026: 1.6.1-beta
 - **The red and purple squares are aprs.fi's, not FT8.** When you zoom out, aprs.fi paints "most active areas" (blue quieter, red busier). **Activity squares** is off, so that fill is hidden. Turn it on for a faint outline only.
 - **FT8 stays light.** Zoomed in, stations are small teal dots drawn under the APRS and MeshCore markers. Zoomed out, each grid is one count bubble, and at most a few hundred are drawn. The download is still one grid at the middle of the map, at most every 5 minutes, and only while FT8 spots is on. Moving the map waits a moment before redrawing, so the page does not stall.
