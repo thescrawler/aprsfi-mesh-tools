@@ -25,7 +25,7 @@ At the bottom of the panel:
 - **📖 Help / Wiki:** opens this wiki in a new tab.
 - **Show tips again:** shows the welcome tip (and any old-script notice) again.
 - **Put this box back in the corner**
-- The version number, e.g. *Mesh Tools 1.5.0-beta*.
+- The version number, e.g. *Mesh Tools 1.6.0-beta*.
 
 ## Units
 

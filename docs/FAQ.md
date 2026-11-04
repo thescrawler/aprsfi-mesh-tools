@@ -15,6 +15,15 @@ Yes, but not in Chrome. On **Android**, use Firefox or Microsoft Edge with Tampe
 **Why don't I see my Meshtastic node?**
 Only nodes that reach the internet through MQTT appear on meshmap.net, the source used here. Also check that it was heard within the *Heard from in the last* period.
 
+**What is the blue ring on a red diamond with P?**
+That is a Winlink GPS position report. Winlink copies it onto APRS as an object from the station **WINLINK** to **APWL2K**. aprs.fi already shows the details, including when it was heard, so Mesh Tools does not replace that box. The **Winlink position reports** switch on the Map layers tab hides those reports. A Winlink gateway is a different station and stays on the map.
+
+**What are the teal FT8 dots?**
+Stations that PSKReporter heard on FT8, drawn at the middle of their grid square (not an exact location). The switch is **off** until you turn it on. Mesh Tools then asks PSKReporter at most once every 5 minutes, which is as often as they allow. Tap a dot for the callsign, band, signal report, time, and who heard them.
+
+**What does the gold ring on a repeater mean?**
+That repeater or room server has gone quiet. It has not sent an advert for longer than **Quiet after** on the Mesh nodes tab (24 hours unless you change it). The popup says **Silent for**, with days and hours, for example *Silent for 2d 3h*. Open **Gone quiet in view** for a list of the ones on the map. It uses the last-heard time already downloaded. It does not ask the server any more often.
+
 **Why don't I see my MeshCore node?**
 It must be listed on map.meshcore.io (it has to have advertised a position that reached the map). Also check the *heard* filter and that you're zoomed in to zoom 6 or closer.
 

@@ -10,6 +10,8 @@ aprs.fi can get crowded. This tab lets you **hide** kinds of things on the map s
 | **Fixed stations** | Home stations, digipeaters, iGates |
 | **Weather** | Weather stations |
 | **Objects** | Every APRS object. The rows under it hide one kind at a time (see below). |
+| **Winlink position reports** | GPS reports that Winlink copies onto APRS (a **P** in a red diamond, sent from **WINLINK** to **APWL2K**). On adds a blue ring and keeps aprs.fi's own info box. Off hides those reports. Winlink gateways are left as they are. |
+| **FT8 spots** | **Off** until you turn it on. Teal dots for FT8 stations from PSKReporter, at the middle of their grid square. |
 | **Items** | APRS items |
 | **AIS ships** | Ships from AIS |
 | **Aircraft (ADS-B)** | Aircraft |
@@ -32,6 +34,10 @@ Under **Objects**, six rows split APRS objects by the symbol aprs.fi already use
 **Objects** is the master switch. Turn it off and every object disappears, whatever the rows say. Turn it on, then untick one row to hide just that kind. The rows look faded while **Objects** is off, so you can see they are waiting.
 
 A real weather station, ship or home station is **not** an object. Those stay on **Weather**, **AIS ships** or **Fixed stations**, even when they use a similar picture. **Items** stay on the **Items** row.
+
+**Winlink position reports** are only the GPS positions Winlink posts as APRS objects. aprs.fi already shows who they are and when they were heard, so Mesh Tools does not replace that box. It only adds a blue ring, or hides them if you turn the switch off. A Winlink gateway (a station that is itself a gateway) is not one of these reports, and this switch does not hide it.
+
+**FT8 spots** stays off until you turn it on. Then Mesh Tools asks [PSKReporter](https://www.pskreporter.info/pskdev.html) for FT8 reports in the grid square at the middle of the map (`modify=grid`, mode FT8, about the last hour). PSKReporter asks apps not to query more than once every 5 minutes, so Mesh Tools waits at least that long, and it remembers the last answer so a reload in that window does not ask again. Zoomed far out, it uses the wider 2-letter grid. Each dot is the middle of the station's grid square, not a precise GPS fix. Tap a dot for the callsign, band and frequency, SNR, time, and who heard them. **Show all** does not turn this on, because it downloads from another site.
 
 ## Advanced
 

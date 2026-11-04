@@ -31,6 +31,8 @@ For MeshCore **repeaters and room servers**, the popup also has a **📶 Coverag
 
 Hover over a marker (desktop) to see a small label such as *"MeshCore Repeater: Hilltop"*.
 
+A **gold ring** around a red ◆R or purple ◆S means that repeater or room server has **gone quiet**: no advert for longer than **Quiet after** (24 hours by default). The popup adds a line, **Silent for 1d 4h** (days and hours). Companions and sensors are not flagged. This uses the last-heard time already downloaded. It does not check the network any more often.
+
 ## Settings
 
 | Setting | Options (default **bold**) | What it does |
@@ -41,6 +43,9 @@ Hover over a marker (desktop) to see a small label such as *"MeshCore Repeater: 
 | **Room servers** | **On** / off | Purple ◆S. Chat rooms that store messages. Also hides the plain purple room dots. |
 | **Sensors** | **On** / off | Teal ◆s. Radios that report a sensor reading. |
 | **Other / unknown** | **On** / off | Grey ◆?. Any MeshCore type that is not one of the four above. |
+| **Flag gone-quiet repeaters** | **On** / off | Gold ring on MeshCore repeaters and room servers that have not been heard for longer than **Quiet after**. The popup says *Silent for Xd Yh*. |
+| **Quiet after** | 12 hours, **24 hours**, 3 days, 7 days | How long with no advert before the gold ring appears. |
+| **Gone quiet in view** | list, closed until you open it | Names of quiet repeaters and room servers in the current map view, longest silent first. |
 | **Show Meshtastic nodes** | **On** / off | Shows or hides Meshtastic radios from meshmap.net. |
 | **Heard from in the last** *(Advanced)* | 1, 7, **30**, 90 days | Hides nodes not heard from in this many days, so old or switched-off radios disappear. Nodes with no "last heard" time are always shown. |
 | **Most nodes to draw** *(Advanced)* | 100, **400**, 1000 | The most markers drawn **per network** (MeshCore and Meshtastic separately). If more are in view, the ones **nearest the centre of the map** are drawn. Lower this if the map feels slow on your phone. |

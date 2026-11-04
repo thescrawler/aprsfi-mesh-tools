@@ -54,7 +54,9 @@ Open **🗺️ Map layers** when the map is too busy.
 
 Switches turn kinds of aprs.fi markers **off or on**. Nothing is deleted. Turn a switch back on and those markers return.
 
-- **Moving stations**, **Fixed stations**, **Weather**, **Objects**, **Items**, **AIS ships**, **Aircraft**.
+- **Moving stations**, **Fixed stations**, **Weather**, **Objects**, **Winlink position reports**, **Items**, **AIS ships**, **Aircraft**.
+- **Winlink position reports** are GPS positions Winlink posts onto APRS (a P in a red diamond). On, they get a blue ring and keep aprs.fi's own info box. Off, those reports hide. Winlink gateways stay either way.
+- **FT8 spots** is off until you turn it on. Teal dots show FT8 stations from PSKReporter, at the middle of their grid square. It checks at most once every 5 minutes.
 - Under **Objects**, extra rows hide one kind of object: repeater towers, weather alerts, events, emergency markers, plain dots, and anything else. Each row shows the same little picture aprs.fi uses.
 - **Show all** and **Hide all** flip every switch at once.
 - **Advanced** hides labels, track lines, old-position dots, direction lines, and range circles.
@@ -78,6 +80,8 @@ Under it, one row per kind. The picture matches the map:
 **Show Meshtastic nodes** shows green **●M** dots. Only Meshtastic radios that reach the internet appear.
 
 Tap a diamond or dot for its name, when it was last heard, and where it is. On a repeater or room server, the popup also has **Show coverage**.
+
+**Flag gone-quiet repeaters** (on by default) puts a gold ring on repeaters and room servers that have not advertised for a while. **Quiet after** is 12 hours, 24 hours, 3 days, or 7 days. Open **Gone quiet in view** for the names on the map right now. The popup says **Silent for**, with days and hours.
 
 **Advanced** on this tab: hide quiet radios (**Heard from in the last**), draw fewer markers if the phone feels slow, or **Download fresh node lists** if new radios are missing.
 
