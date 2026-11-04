@@ -1,5 +1,9 @@
 # 📝 Changelog
 
+## Nov 4, 2026: 1.6.3-beta
+- **FT8 downloads only when you tap Fetch FT8 now.** Turning the switch on, moving the map, and the old center-square check no longer contact PSKReporter, and they no longer start the 5-minute wait. An empty saved result (such as 0 spots) does not lock the button either.
+- **The query asks for stations in the fields you can see.** Each request is one 2-letter Maidenhead field, `senderCallsign` plus `modify=grid`, mode FT8, the last 15 minutes. A 4-character square at the map center was the wrong question: `HN14` is a patch of the North Atlantic and correctly comes back with no FT8 spots, while `CN`, `DN`, `DM`, and `EM` come back full. One request cannot take two fields (`EM,FN` is empty), so a wide view still fetches the 4 fields nearest the center and says so. Zoom in and tap again for the rest.
+
 ## Nov 4, 2026: 1.6.2-beta
 - **Fetch FT8 now.** The button loads FT8 spots for the 2-letter Maidenhead fields covering the map (PSKReporter `modify=grid`, mode FT8, last 15 minutes). If the view spans more than 4 fields, it fetches the 4 nearest the center and says so. Fields are requested one after another. The button then waits 5 minutes and shows **Cached, refresh available in Xm**. The quiet background check is still only the square at the middle of the map.
 

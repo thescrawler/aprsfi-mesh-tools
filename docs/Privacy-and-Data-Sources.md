@@ -9,14 +9,14 @@ Mesh Tools only *downloads* public data. These are the only sites it contacts (t
 | **MeshCore map** | `https://map.meshcore.io/api/v1/nodes` | MeshCore nodes (Mesh nodes tab) and repeater list (Coverage) | At most every 10 min for the map, and every 6 h for the Coverage repeater list |
 | **meshmap.net** | `https://meshmap.net/nodes.json` | Meshtastic nodes | At most every 10 min |
 | **AWS Terrain Tiles** (Amazon S3 open data) | `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png` | Hill heights for coverage | Only when computing coverage, for the tiles needed |
-| **PSKReporter** | `https://retrieve.pskreporter.info/query` | FT8 spots for the grid at the middle of the map | Only while **FT8 spots** is on, and at most every 5 minutes |
+| **PSKReporter** | `https://retrieve.pskreporter.info/query` | FT8 spots for up to 4 Maidenhead fields in view | Only when you tap **Fetch FT8 now**, then at most every 5 minutes |
 
 Plus aprs.fi itself, which you're already visiting.
 
 ## What is sent
 
 - **Nothing about you is uploaded** by Mesh Tools. It never posts data, and has no analytics, tracking or accounts.
-- The requests above are ordinary downloads. As with visiting any website, those servers can see your IP address and which file was requested. For terrain tiles, the tile numbers reveal roughly which area of the map you computed coverage for. An FT8 query names the grid square at the middle of the map, so PSKReporter can see that area too. The query also names this project (`appcontact` is the GitHub address) so they can reach the author if a query misbehaves. Nothing about your callsign is sent.
+- The requests above are ordinary downloads. As with visiting any website, those servers can see your IP address and which file was requested. For terrain tiles, the tile numbers reveal roughly which area of the map you computed coverage for. An FT8 query names the Maidenhead fields in view, so PSKReporter can see that area too. The query also names this project (`appcontact` is the GitHub address) so they can reach the author if a query misbehaves. Nothing about your callsign is sent.
 - Your pins, heights and settings are **never sent anywhere**.
 
 ## What is stored on your device

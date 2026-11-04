@@ -57,7 +57,7 @@ Switches turn kinds of aprs.fi markers **off or on**. Nothing is deleted. Turn a
 - **Moving stations**, **Fixed stations**, **Weather**, **Objects**, **Winlink position reports**, **Items**, **AIS ships**, **Aircraft**.
 - **Winlink position reports** are GPS positions Winlink posts onto APRS (a P in a red diamond). On, they get a blue ring and keep aprs.fi's own info box. Off, those reports hide. Winlink gateways stay either way.
 - **Activity squares** is off. Those are aprs.fi's red and blue blocks when you zoom out, not Mesh Tools. Turn the switch on only if you want a faint outline of them.
-- **FT8 spots** is off until you turn it on. Zoomed in, stations are small teal dots under the other markers. Zoomed out, they become count bubbles so they do not cover the map. **Fetch FT8 now** loads the 2-letter fields in view (up to 4), then waits 5 minutes. The quiet background check stays on the center square.
+- **FT8 spots** is off until you turn it on. Zoomed in, stations are small teal dots under the other markers. Zoomed out, they become count bubbles so they do not cover the map. Nothing downloads until you tap **Fetch FT8 now**, which loads the 2-letter fields in view (up to 4), then waits 5 minutes.
 - Under **Objects**, extra rows hide one kind of object: repeater towers, weather alerts, events, emergency markers, plain dots, and anything else. Each row shows the same little picture aprs.fi uses.
 - **Show all** and **Hide all** flip every switch at once.
 - **Advanced** hides labels, track lines, old-position dots, direction lines, and range circles.
