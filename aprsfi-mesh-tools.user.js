@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         aprs.fi Mesh Tools (beta)
 // @namespace    https://greasyfork.org/users/aprsfi-mesh-overlay
-// @version      1.6.2-beta
+// @version      1.6.3-beta
 // @description  One easy panel for aprs.fi: see MeshCore & Meshtastic radios on the map, check roughly where a repeater can reach, and hide map clutter. Bundles Mesh Overlay, Mesh Coverage and Map Layer Toggles.
 // @author       aprsfi-mesh-overlay contributors
 // @license      MIT
@@ -36,7 +36,7 @@
  *  - MeshCore nodes: https://map.meshcore.io/api/v1/nodes (downloaded once, shared by nodes + coverage)
  *  - Meshtastic nodes: https://meshmap.net/nodes.json (MQTT-reporting nodes only)
  *  - Terrain: AWS Terrain Tiles (terrarium), https://registry.opendata.aws/terrain-tiles/
- *  - FT8 spots (only if that switch is on): https://retrieve.pskreporter.info/query  (at most every 5 minutes)
+ *  - FT8 spots (only when you tap Fetch FT8 now): https://retrieve.pskreporter.info/query  (at most every 5 minutes)
  * Coverage is a bare-earth line-of-sight ESTIMATE (ignores trees/buildings; antenna heights assumed).
  *
  * This file bundles aprsfi-mesh-overlay 1.2.0, aprsfi-mesh-coverage 0.4.0 and aprsfi-layer-toggles 0.2.0
@@ -52,7 +52,7 @@
   const performance = globalThis.performance || { now: () => Date.now() };
   const BOOTED = performance.now();
   const W = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : (typeof window !== 'undefined' ? window : globalThis);
-  const VERSION = '1.6.2-beta';
+  const VERSION = '1.6.3-beta';
   const TAG = '[mesh-tools]';
   const WIKI_URL = 'https://github.com/thescrawler/aprsfi-mesh-tools/blob/main/docs/Home.md'; // 📖 Help / Wiki link in Panel settings
 
@@ -1678,13 +1678,7 @@
     }
     // FT8 spots from PSKReporter. One query at a time, never more often than every 5 minutes (their rule).
     const FT8_GAP = 5 * 60 * 1000;
-    let ft8On = GM_getValue('lt_show_ft8', false) === true, ft8At = 0, ft8Spots = [], ft8Grid = '', ft8Busy = false, ft8Err = '', ft8Timer = null, ft8Layer = null;
-    function maidenhead(lat, lon, len) {
-      const s = String.fromCharCode(65 + Math.floor((lon + 180) / 20)) + String.fromCharCode(65 + Math.floor((lat + 90) / 10))
-        + Math.floor(((lon + 180) % 20) / 2) + Math.floor((lat + 90) % 10);
-      if ((len || 4) <= 4) return s;
-      return s + String.fromCharCode(65 + Math.floor(((lon + 180) % 2) / 2 * 24)) + String.fromCharCode(65 + Math.floor(((lat + 90) % 1) * 24));
-    }
+    let ft8On = GM_getValue('lt_show_ft8', false) === true, ft8At = 0, ft8Spots = [], ft8Grid = '', ft8Busy = false, ft8Err = '', ft8Layer = null;
     function fieldOf(lat, lon) {
       const lonN = ((lon + 180) % 360 + 360) % 360 - 180;
       const latN = Math.max(-89.9, Math.min(89.9, lat));
@@ -1734,17 +1728,46 @@
       for (const b of bands) if (m >= b[0] && m < b[0] + (b[0] < 10 ? 1 : 2)) name = b[1];
       return (name ? name + ' · ' : '') + (m ? m.toFixed(3) + ' MHz' : 'unknown');
     }
-    function ft8Parse(xml) {
-      let doc; try { doc = new DOMParser().parseFromString(xml, 'text/xml'); } catch (e) { return []; }
-      const rows = doc.getElementsByTagName('receptionReport'), by = new Map();
+    function ft8Attr(el, name) {
+      if (el && typeof el.getAttribute === 'function') {
+        const v = el.getAttribute(name);
+        return v == null ? '' : String(v);
+      }
+      const tag = String(el || '');
+      const quoted = tag.match(new RegExp('\\b' + name + '="([^"]*)"', 'i'));
+      if (quoted) return quoted[1];
+      const bare = tag.match(new RegExp('\\b' + name + '=([^\\s"/>]+)', 'i'));
+      return bare ? bare[1] : '';
+    }
+    function ft8Rows(xml) {
+      const text = String(xml || '');
+      let doc = null;
+      try { doc = new DOMParser().parseFromString(text, 'text/xml'); } catch (e) { doc = null; }
+      const broken = !doc || doc.getElementsByTagName('parsererror').length;
+      if (!broken) {
+        const rows = doc.getElementsByTagName('receptionReport'), out = [];
+        for (let i = 0; i < rows.length; i++) out.push(rows[i]);
+        if (out.length || text.indexOf('receptionReport') < 0) return out;
+      }
+      return text.match(/<receptionReport\b[^>]*>/gi) || [];
+    }
+    // Keep the transmitting station. senderLocator is where it was heard from.
+    // prefix limits the list to that Maidenhead field (EM matches EM12, not EN).
+    function ft8Parse(xml, prefix) {
+      const want = String(prefix || '').toUpperCase();
+      const by = new Map();
+      const rows = ft8Rows(xml);
       for (let i = 0; i < rows.length; i++) {
-        const el = rows[i], call = el.getAttribute('senderCallsign'), loc = el.getAttribute('senderLocator');
-        if (!call || !loc || loc.length < 4 || !gridCenter(loc)) continue;
-        const t = +el.getAttribute('flowStartSeconds') || 0;
+        const el = rows[i];
+        const call = ft8Attr(el, 'senderCallsign');
+        const loc = String(ft8Attr(el, 'senderLocator') || '').toUpperCase();
+        if (!call || loc.length < 4 || !gridCenter(loc)) continue;
+        if (want && loc.slice(0, want.length) !== want) continue;
+        const t = +ft8Attr(el, 'flowStartSeconds') || 0;
         let rec = by.get(call);
         if (!rec) { rec = { call, loc, freq: 0, snr: '', t: 0, heard: [] }; by.set(call, rec); }
-        if (t >= rec.t) { rec.t = t; rec.loc = loc; rec.freq = +el.getAttribute('frequency') || rec.freq; rec.snr = el.getAttribute('sNR') || el.getAttribute('snr') || rec.snr; }
-        const rx = el.getAttribute('receiverCallsign');
+        if (t >= rec.t) { rec.t = t; rec.loc = loc; rec.freq = +ft8Attr(el, 'frequency') || rec.freq; rec.snr = ft8Attr(el, 'sNR') || ft8Attr(el, 'snr') || rec.snr; }
+        const rx = ft8Attr(el, 'receiverCallsign');
         if (rx && rec.heard.indexOf(rx) < 0 && rec.heard.length < 8) rec.heard.push(rx);
       }
       return Array.from(by.values());
@@ -1793,7 +1816,7 @@
       if (!ft8On) { el.textContent = 'Off. Nothing is downloaded until you turn this on, or tap Fetch FT8 now.'; return; }
       el.textContent = (ft8Err ? 'Couldn\'t load spots (' + ft8Err + '). ' : (ft8Spots.length + ' spots' + (ft8Grid ? ' from ' + ft8Grid : '') + '. '))
         + (ft8Note ? ft8Note + ' ' : '')
-        + (ft8Busy ? 'Loading…' : (wait ? 'Cached, refresh available in ' + mins + 'm.' : 'Ready. Background checks stay on the center square.'));
+        + (ft8Busy ? 'Loading…' : (wait ? 'Cached, refresh available in ' + mins + 'm.' : 'Tap Fetch FT8 now. Nothing downloads until you tap it.'));
     }
     function ft8Status() { ft8Tick(); }
     function ft8Popup(rec) {
@@ -1846,30 +1869,16 @@
         m.addTo(ft8Layer); shown++;
       }
     }
-    function ft8Arm() {
-      clearTimeout(ft8Timer);
-      if (!ft8On) return;
-      const wait = Math.max(1000, FT8_GAP - (Date.now() - ft8At));
-      ft8Timer = setTimeout(() => { if (ft8On && map) ft8Fetch(); }, ft8At ? wait : 1000);
-    }
-    function ft8Url(grid, secs) {
-      return 'https://retrieve.pskreporter.info/query?modify=grid&callsign=' + encodeURIComponent(grid)
-        + '&mode=FT8&rronly=1&noactive=1&flowStartSeconds=' + secs + '&rptlimit=200&appcontact=' + encodeURIComponent('https://github.com/thescrawler/aprsfi-mesh-tools');
+    // senderCallsign + modify=grid asks for stations transmitting FROM that field.
+    // callsign= alone also returns stations outside the field (whoever a local receiver heard).
+    // One field per request: "EM,FN" comes back empty. rronly=1 skips the worldwide monitor list.
+    function ft8Url(grid) {
+      return 'https://retrieve.pskreporter.info/query?modify=grid&senderCallsign=' + encodeURIComponent(grid)
+        + '&mode=FT8&rronly=1&noactive=1&flowStartSeconds=-900&rptlimit=250&appcontact=' + encodeURIComponent('https://github.com/thescrawler/aprsfi-mesh-tools');
     }
     function ft8Save() { try { GM_setValue('ft8_cache', { t: ft8At, grid: ft8Grid, spots: ft8Spots }); } catch (e) { /* */ } }
     function ft8UiArm() { clearInterval(ft8UiT); if (ft8On) ft8UiT = setInterval(ft8Tick, 30000); }
-    // Background check: one square at the middle of the map. Never overlaps a wider fetch.
-    function ft8Fetch() {
-      if (!ft8On || !map || ft8Busy) return;
-      if (ft8Wait()) { ft8Draw(); ft8Tick(); ft8Arm(); return; }
-      const c = map.getCenter();
-      const grid = maidenhead(c.lat, c.lng, 4);
-      ft8Busy = true; ft8At = Date.now(); ft8Grid = grid; ft8Note = ''; ft8Tick(); ft8Arm();
-      gmGet(ft8Url(grid, -3600), 'text', 30000).then(r => {
-        ft8Spots = ft8Parse(r.responseText); ft8Err = ''; ft8Save();
-      }).catch(e => { ft8Err = friendly(e); }).then(() => { ft8Busy = false; ft8Draw(); ft8Tick(); });
-    }
-    // On demand: 2-letter Maidenhead fields covering the view, one request after another, at most 4.
+    // On demand only. 2-letter fields covering the view, one request after another, at most 4.
     async function ft8FetchNow() {
       if (!map || ft8Busy) return;
       if (!ft8On) { ft8On = true; const cb = $id('lt-ft8'); if (cb) cb.checked = true; GM_setValue('lt_show_ft8', true); ft8UiArm(); }
@@ -1877,14 +1886,16 @@
       const found = fieldsInView(), take = found.fields.slice(0, 4);
       ft8Note = found.total > 4 ? 'This view covers ' + found.total + ' fields. Fetched the 4 nearest the center. Zoom in for the rest.' : '';
       if (!take.length) { ft8Note = 'No grid in view.'; ft8Tick(); return; }
-      ft8Busy = true; ft8At = Date.now(); ft8Err = ''; ft8Arm(); ft8Tick();
+      ft8Busy = true; ft8At = Date.now(); ft8Err = ''; ft8Tick();
       const merged = new Map();
       for (let i = 0; i < take.length && ft8On; i++) {
         ft8Grid = take.slice(0, i + 1).join(' ');
         ft8Tick();
         try {
-          const r = await gmGet(ft8Url(take[i], -900), 'text', 30000);
-          for (const s of ft8Parse(r.responseText)) { const prev = merged.get(s.call); if (!prev || s.t >= prev.t) merged.set(s.call, s); }
+          const r = await gmGet(ft8Url(take[i]), 'text', 30000);
+          const got = ft8Parse(r.responseText, take[i]);
+          got.sort((a, b) => b.t - a.t);
+          for (const s of got.slice(0, 400)) { const prev = merged.get(s.call); if (!prev || s.t >= prev.t) merged.set(s.call, s); }
         } catch (e) { ft8Err = friendly(e); break; }
         if (i + 1 < take.length) await new Promise(res => setTimeout(res, 0));
       }
@@ -1894,26 +1905,21 @@
     function ft8Start() {
       if (!ft8On || !map) { ft8Draw(); ft8Status(); return; }
       const cached = GM_getValue('ft8_cache', null);
-      if (cached && cached.t && Date.now() - cached.t < FT8_GAP && Array.isArray(cached.spots)) {
-        ft8At = cached.t; ft8Spots = cached.spots; ft8Grid = cached.grid || '';
-        ft8Draw(); ft8Tick(); ft8Arm(); ft8UiArm(); return;
+      if (cached && Array.isArray(cached.spots) && cached.spots.length) {
+        ft8Spots = cached.spots; ft8Grid = cached.grid || '';
+        ft8At = cached.t && Date.now() - cached.t < FT8_GAP ? cached.t : 0;
       }
-      ft8UiArm();
-      ft8Fetch();
+      ft8UiArm(); ft8Draw(); ft8Tick();
     }
     function ft8Stop() {
-      clearTimeout(ft8Timer); clearTimeout(ft8MoveT); clearInterval(ft8UiT); ft8Timer = null; ft8MoveT = null; ft8UiT = null; ft8Busy = false;
+      clearTimeout(ft8MoveT); clearInterval(ft8UiT); ft8MoveT = null; ft8UiT = null; ft8Busy = false;
       if (ft8Layer && map) { map.removeLayer(ft8Layer); ft8Layer = null; }
     }
     let ft8MoveT = null;
     function ft8OnMove() {
       if (!ft8On) return;
       clearTimeout(ft8MoveT);
-      ft8MoveT = setTimeout(() => {
-        ft8Draw();
-        if (!ft8At || Date.now() - ft8At >= FT8_GAP) ft8Fetch();
-        else ft8Status();
-      }, 450);
+      ft8MoveT = setTimeout(() => { ft8Draw(); ft8Tick(); }, 450);
     }
     const TIPS = { moving: 'Cars, hikers, anything that moves', fixed: 'Home stations, digipeaters, gateways', weather: 'Weather stations', object: 'All APRS objects. The list under this splits them by symbol.',
       winlink: 'GPS reports that Winlink posts onto APRS. A blue ring. Gateways are not affected.',
@@ -1938,7 +1944,7 @@
         <div class="sec">What to show</div>
         ${stations}
         <label title="FT8 stations from PSKReporter. Off until you turn it on."><input type="checkbox" id="lt-ft8"${ft8On ? ' checked' : ''}><span><b>FT8 spots</b>
-          <small>Teal dots at each station's grid square. One download every 5 minutes, only while this is on.</small></span></label>
+          <small>Teal dots at each station's grid. Nothing downloads until you tap Fetch FT8 now.</small></span></label>
         <button type="button" id="lt-ft8-now">Fetch FT8 now</button>
         <div class="info" id="lt-ft8-st"></div>
         <details class="adv"><summary>Advanced: lines, labels &amp; circles</summary>
@@ -2186,7 +2192,7 @@
     'lt:object': 'Things someone placed on the map, such as a net or a repeater object. They are not moving radios. Turn this off to hide every object. The rows under it hide one kind at a time.',
     'lt:winlink': 'GPS position reports that Winlink copies onto APRS. aprs.fi shows them as P in a red diamond, from the station WINLINK to APWL2K. On adds a blue ring and keeps aprs.fi\'s own info box. Off hides those reports. Winlink gateways are not changed.',
     'lt:activity': 'aprs.fi draws these filled squares when you zoom out: blue is quieter, red is busier. Off by default so they do not cover the map. On shows a faint outline only. This is aprs.fi\'s own layer, not FT8.',
-    'lt-ft8': 'Small teal dots for FT8 stations from PSKReporter, under the APRS markers. Zoomed out they group into count bubbles. Off by default. A quiet background check uses only the square at the middle of the map, at most every 5 minutes.',
+    'lt-ft8': 'Small teal dots for FT8 stations from PSKReporter, under the APRS markers. Zoomed out they group into count bubbles. Off by default. Turning it on does not download anything.',
     'lt-ft8-now': 'Downloads FT8 spots for the 2-letter grid fields covering this view, one field at a time, up to 4. PSKReporter asks for 5 minutes between downloads, so the button waits and says when it can run again.',
     'lt:obj-radio': 'Repeater towers, digipeaters, internet gateways and antenna sites that were placed on the map as objects.',
     'lt:obj-wx': 'Weather stations, plus storm, tornado, flood and other weather warnings placed as objects.',
