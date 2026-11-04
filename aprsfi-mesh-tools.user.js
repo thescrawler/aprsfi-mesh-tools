@@ -19,6 +19,7 @@
 // @connect      map.meshcore.io
 // @connect      meshmap.net
 // @connect      s3.amazonaws.com
+// @connect      retrieve.pskreporter.info
 // @run-at       document-start
 // ==/UserScript==
 /*
@@ -35,6 +36,7 @@
  *  - MeshCore nodes: https://map.meshcore.io/api/v1/nodes (downloaded once, shared by nodes + coverage)
  *  - Meshtastic nodes: https://meshmap.net/nodes.json (MQTT-reporting nodes only)
  *  - Terrain: AWS Terrain Tiles (terrarium), https://registry.opendata.aws/terrain-tiles/
+ *  - FT8 spots (only if that switch is on): https://retrieve.pskreporter.info/query  (at most every 5 minutes)
  * Coverage is a bare-earth line-of-sight ESTIMATE (ignores trees/buildings; antenna heights assumed).
  *
  * This file bundles aprsfi-mesh-overlay 1.2.0, aprsfi-mesh-coverage 0.4.0 and aprsfi-layer-toggles 0.2.0
@@ -1469,6 +1471,7 @@
       ['fixed',    'Fixed stations',         'stations'],
       ['weather',  'Weather stations',       'stations'],
       ['object',   'Objects',                'stations'],
+      ['winlink',  'Winlink position reports', 'stations'],
       ['item',     'Items',                  'stations'],
       ['ais',      'AIS ships',              'stations'],
       ['aircraft', 'Aircraft (ADS-B)',       'stations'],
@@ -1531,11 +1534,23 @@
       for (const k in obj) { try { if (obj[k] === layer) return true; } catch (e) { /* */ } }
       return false;
     };
+    // Winlink mirrors a user's GPS to APRS-IS as an object: source WINLINK, destination APWL2K,
+    // drawn by aprs.fi as P on a red diamond. Gateways keep their own callsign, so they are left alone.
+    function isWinlinkReport(info, pt) {
+      if (!info) return false;
+      const base = String(info.srccall || '').toUpperCase().split('-')[0];
+      if (base !== 'WINLINK') return false;
+      const dst = String((pt && pt.dstcall) || (info.Xje && info.Xje.dstcall) || info.dstcall || '').toUpperCase().split('-')[0];
+      if (dst) return dst === 'APWL2K';
+      const sym = String(info.symbol || '');
+      return sym.length >= 2 && sym.charAt(0).toUpperCase() === 'P' && sym.charAt(1).toLowerCase() === 'a';
+    }
     function stationKind(info, pt) {
       if (!info) return 'fixed';
       if (info.cla === 'i') return 'ais';
       if (info.cla === 's') return 'aircraft';
       if (info.type === 'w' || info.wxtime) return 'weather';
+      if (isWinlinkReport(info, pt)) return 'winlink';
       if (info.type === 'o') return 'object';
       if (info.type === 'i') return 'item';
       const tid = info.tid;
@@ -1598,7 +1613,13 @@
     function applyLayer(layer, extraKeys) {
       const keys = classify(layer);
       if (!keys) return;
-      setVisible(layer, allOn(extraKeys ? keys.concat(extraKeys) : keys));
+      const vis = allOn(extraKeys ? keys.concat(extraKeys) : keys);
+      setVisible(layer, vis);
+      const el = layer._icon;
+      if (el && keys.indexOf('winlink') >= 0) {
+        if (vis) { el.style.boxShadow = '0 0 0 3px #1d4ed8'; el.style.borderRadius = '3px'; el.dataset.wl = '1'; }
+        else if (el.dataset.wl) { el.style.boxShadow = ''; el.style.borderRadius = ''; }
+      }
     }
 
     let map = null, passTimer = null, active = false, ivl = null;
@@ -1632,15 +1653,18 @@
       map = m; active = true;
       m.on('layeradd', onAdd);
       m.on('zoomend moveend', schedulePass);
+      m.on('zoomend moveend', ft8OnMove);
       ivl = setInterval(schedulePass, 5000);
       fullPass();
+      if (ft8On) ft8Start(); else ft8Status();
     }
     function disable() {
       if (!active) return;
       // put everything back the way aprs.fi drew it, then stop
-      try { map.eachLayer(l => { try { setVisible(l, true); } catch (e) { /* */ } }); } catch (e) { /* */ }
+      try { map.eachLayer(l => { try { setVisible(l, true); if (l._icon && l._icon.dataset.wl) { l._icon.style.boxShadow = ''; l._icon.style.borderRadius = ''; delete l._icon.dataset.wl; } } catch (e) { /* */ } }); } catch (e) { /* */ }
+      ft8Stop();
       active = false; clearInterval(ivl);
-      map.off('layeradd', onAdd); map.off('zoomend moveend', schedulePass);
+      map.off('layeradd', onAdd); map.off('zoomend moveend', schedulePass); map.off('zoomend moveend', ft8OnMove);
     }
     let countEl = null;
     function updateCounts() {
@@ -1650,7 +1674,117 @@
       map.eachLayer(l => { if (l.Xjf !== undefined) { total++; if (l._ltHidden) hidden++; } });
       countEl.textContent = total ? `${total - hidden} of ${total} map points showing` : '';
     }
+    // FT8 spots from PSKReporter. One query at a time, never more often than every 5 minutes (their rule).
+    const FT8_GAP = 5 * 60 * 1000;
+    let ft8On = GM_getValue('lt_show_ft8', false) === true, ft8At = 0, ft8Spots = [], ft8Grid = '', ft8Busy = false, ft8Err = '', ft8Timer = null, ft8Layer = null;
+    function maidenhead(lat, lon, len) {
+      const s = String.fromCharCode(65 + Math.floor((lon + 180) / 20)) + String.fromCharCode(65 + Math.floor((lat + 90) / 10))
+        + Math.floor(((lon + 180) % 20) / 2) + Math.floor((lat + 90) % 10);
+      if ((len || 4) <= 4) return s;
+      return s + String.fromCharCode(65 + Math.floor(((lon + 180) % 2) / 2 * 24)) + String.fromCharCode(65 + Math.floor(((lat + 90) % 1) * 24));
+    }
+    function gridCenter(loc) {
+      loc = String(loc || '').trim().toUpperCase();
+      if (loc.length < 4) return null;
+      const lon0 = (loc.charCodeAt(0) - 65) * 20 + parseInt(loc[2], 10) * 2 - 180;
+      const lat0 = (loc.charCodeAt(1) - 65) * 10 + parseInt(loc[3], 10) - 90;
+      if (loc.length >= 6) {
+        const x = loc.charCodeAt(4) - 65, y = loc.charCodeAt(5) - 65;
+        if (x < 0 || x > 23 || y < 0 || y > 23) return [lat0 + 0.5, lon0 + 1];
+        return [lat0 + (y + 0.5) / 24, lon0 + (x + 0.5) * 2 / 24];
+      }
+      return [lat0 + 0.5, lon0 + 1];
+    }
+    function ft8Band(hz) {
+      const m = (+hz || 0) / 1e6;
+      const bands = [[1.8, '160m'], [3.5, '80m'], [5, '60m'], [7, '40m'], [10, '30m'], [14, '20m'], [18, '17m'], [21, '15m'], [24, '12m'], [28, '10m'], [50, '6m']];
+      let name = '';
+      for (const b of bands) if (m >= b[0] && m < b[0] + (b[0] < 10 ? 1 : 2)) name = b[1];
+      return (name ? name + ' · ' : '') + (m ? m.toFixed(3) + ' MHz' : 'unknown');
+    }
+    function ft8Parse(xml) {
+      let doc; try { doc = new DOMParser().parseFromString(xml, 'text/xml'); } catch (e) { return []; }
+      const rows = doc.getElementsByTagName('receptionReport'), by = new Map();
+      for (let i = 0; i < rows.length; i++) {
+        const el = rows[i], call = el.getAttribute('senderCallsign'), loc = el.getAttribute('senderLocator');
+        if (!call || !loc || loc.length < 4 || !gridCenter(loc)) continue;
+        const t = +el.getAttribute('flowStartSeconds') || 0;
+        let rec = by.get(call);
+        if (!rec) { rec = { call, loc, freq: 0, snr: '', t: 0, heard: [] }; by.set(call, rec); }
+        if (t >= rec.t) { rec.t = t; rec.loc = loc; rec.freq = +el.getAttribute('frequency') || rec.freq; rec.snr = el.getAttribute('sNR') || el.getAttribute('snr') || rec.snr; }
+        const rx = el.getAttribute('receiverCallsign');
+        if (rx && rec.heard.indexOf(rx) < 0 && rec.heard.length < 8) rec.heard.push(rx);
+      }
+      return Array.from(by.values());
+    }
+    function ft8Status() {
+      const el = $id('lt-ft8-st'); if (!el) return;
+      if (!ft8On) { el.textContent = 'Off. Nothing is downloaded until you turn this on.'; return; }
+      const wait = Math.max(0, FT8_GAP - (Date.now() - ft8At));
+      const mins = Math.ceil(wait / 60000);
+      el.textContent = (ft8Err ? 'Couldn\'t load spots (' + ft8Err + '). ' : (ft8Spots.length + ' spots in ' + (ft8Grid || 'the center grid') + '. '))
+        + (ft8Busy ? 'Loading…' : 'PSKReporter allows one check every 5 minutes' + (mins ? ' (next in ' + mins + ' min).' : '.'));
+    }
+    function ft8Draw() {
+      if (!map || !W.L) return;
+      if (!ft8Layer) ft8Layer = W.L.layerGroup().addTo(map);
+      ft8Layer.clearLayers();
+      if (!ft8On) return;
+      const b = map.getBounds(), s = b.getSouth(), n = b.getNorth(), w = b.getWest(), e = b.getEast(), wrap = w > e;
+      let shown = 0;
+      const list = ft8Spots.slice().sort((a, c) => c.t - a.t);
+      for (const rec of list) {
+        if (shown >= 200) break;
+        const ll = gridCenter(rec.loc); if (!ll) continue;
+        if (ll[0] < s || ll[0] > n) continue;
+        if (!wrap) { if (ll[1] < w || ll[1] > e) continue; } else if (ll[1] < w && ll[1] > e) continue;
+        const m = W.L.circleMarker(ll, { radius: 7, color: '#0f766e', weight: 2, fillColor: '#5eead4', fillOpacity: 0.9 });
+        m.bindPopup(() => `<div style="font:14px sans-serif;min-width:180px"><b>${esc(rec.call)}</b> <small>FT8</small><br><table style="font-size:12px;margin-top:4px">`
+          + `<tr><td style="color:#666;padding-right:6px">Band</td><td>${esc(ft8Band(rec.freq))}</td></tr>`
+          + `<tr><td style="color:#666;padding-right:6px">SNR</td><td>${esc(rec.snr === '' ? '—' : rec.snr + ' dB')}</td></tr>`
+          + `<tr><td style="color:#666;padding-right:6px">Time</td><td>${rec.t ? esc(new Date(rec.t * 1000).toLocaleString()) : '—'}</td></tr>`
+          + `<tr><td style="color:#666;padding-right:6px">Grid</td><td>${esc(rec.loc)}</td></tr>`
+          + `<tr><td style="color:#666;padding-right:6px">Heard by</td><td>${esc(rec.heard.join(', ') || '—')}</td></tr></table>`
+          + `<small style="color:#666">PSKReporter · grid-square center</small></div>`, { maxWidth: 280 });
+        m.addTo(ft8Layer); shown++;
+      }
+    }
+    function ft8Arm() {
+      clearTimeout(ft8Timer);
+      if (!ft8On) return;
+      const wait = Math.max(1000, FT8_GAP - (Date.now() - ft8At));
+      ft8Timer = setTimeout(() => { if (ft8On && map) ft8Fetch(); }, ft8At ? wait : 1000);
+    }
+    function ft8Fetch() {
+      if (!ft8On || !map || ft8Busy) return;
+      if (ft8At && Date.now() - ft8At < FT8_GAP) { ft8Draw(); ft8Status(); ft8Arm(); return; }
+      ft8Busy = true; ft8At = Date.now(); ft8Status(); ft8Arm();
+      const c = map.getCenter();
+      const grid = maidenhead(c.lat, c.lng, map.getZoom() < 5 ? 2 : 4);
+      ft8Grid = grid;
+      const url = 'https://retrieve.pskreporter.info/query?modify=grid&callsign=' + encodeURIComponent(grid)
+        + '&mode=FT8&rronly=1&noactive=1&flowStartSeconds=-3600&rptlimit=200&appcontact=' + encodeURIComponent('https://github.com/thescrawler/aprsfi-mesh-tools');
+      gmGet(url, 'text', 30000).then(r => {
+        ft8Spots = ft8Parse(r.responseText); ft8Err = '';
+        try { GM_setValue('ft8_cache', { t: ft8At, grid, spots: ft8Spots }); } catch (e) { /* */ }
+      }).catch(e => { ft8Err = friendly(e); }).then(() => { ft8Busy = false; ft8Draw(); ft8Status(); });
+    }
+    function ft8Start() {
+      if (!ft8On || !map) { ft8Draw(); ft8Status(); return; }
+      const cached = GM_getValue('ft8_cache', null);
+      if (cached && cached.t && Date.now() - cached.t < FT8_GAP && Array.isArray(cached.spots)) {
+        ft8At = cached.t; ft8Spots = cached.spots; ft8Grid = cached.grid || '';
+        ft8Draw(); ft8Status(); ft8Arm(); return;
+      }
+      ft8Fetch();
+    }
+    function ft8Stop() {
+      clearTimeout(ft8Timer); ft8Timer = null; ft8Busy = false;
+      if (ft8Layer && map) { map.removeLayer(ft8Layer); ft8Layer = null; }
+    }
+    function ft8OnMove() { if (ft8On) { ft8Draw(); if (!ft8At || Date.now() - ft8At >= FT8_GAP) ft8Fetch(); else ft8Status(); } }
     const TIPS = { moving: 'Cars, hikers, anything that moves', fixed: 'Home stations, digipeaters, gateways', weather: 'Weather stations', object: 'All APRS objects. The list under this splits them by symbol.',
+      winlink: 'GPS reports that Winlink posts onto APRS. A blue ring. Gateways are not affected.',
       item: 'Like objects', ais: 'Boats and ships', aircraft: 'Planes', labels: 'The name text next to each icon', tracks: 'Lines showing where something has travelled',
       dots: 'Small dots along a track', heading: 'Lines showing where something is heading', paths: 'Lines that appear when you hover over a station', phg: 'Circles estimating a station\'s range',
       'obj-radio': 'Repeater towers, digipeaters, gateways and antennas placed as objects',
@@ -1670,6 +1804,9 @@
         <div class="btns"><button type="button" id="lt-all">Show all</button><button type="button" id="lt-none">Hide all</button></div>
         <div class="sec">What to show</div>
         ${stations}
+        <label title="FT8 stations from PSKReporter. Off until you turn it on."><input type="checkbox" id="lt-ft8"${ft8On ? ' checked' : ''}><span><b>FT8 spots</b>
+          <small>Teal dots at each station's grid square. One download every 5 minutes, only while this is on.</small></span></label>
+        <div class="info" id="lt-ft8-st"></div>
         <details class="adv"><summary>Advanced: lines, labels &amp; circles</summary>
         ${TOGGLES.filter(t => t[2] === 'overlays').map(row).join('')}
         </details>
@@ -1684,8 +1821,14 @@
       const all = v => { boxes.forEach(cb => { cb.checked = v; set(cb.dataset.k, v); }); syncObj(); fullPass(); };
       $id('lt-all').addEventListener('click', () => all(true));
       $id('lt-none').addEventListener('click', () => all(false));
+      const ft = $id('lt-ft8');
+      ft.addEventListener('change', () => {
+        ft8On = ft.checked; GM_setValue('lt_show_ft8', ft8On);
+        if (ft8On) ft8Start(); else { ft8Stop(); ft8Status(); }
+      });
+      ft8Status();
     }
-    return { sectionHtml, wire, init, disable, isActive: () => active, isBusy: () => false };
+    return { sectionHtml, wire, init, disable, isActive: () => active, isBusy: () => ft8Busy };
   })();
 
   // =====================================================================
@@ -1906,6 +2049,8 @@
     'lt:fixed': 'Stations that stay put: home stations, digipeaters and internet gateways.',
     'lt:weather': 'Weather stations that report temperature, wind and rain.',
     'lt:object': 'Things someone placed on the map, such as a net or a repeater object. They are not moving radios. Turn this off to hide every object. The rows under it hide one kind at a time.',
+    'lt:winlink': 'GPS position reports that Winlink copies onto APRS. aprs.fi shows them as P in a red diamond, from the station WINLINK to APWL2K. On adds a blue ring and keeps aprs.fi\'s own info box. Off hides those reports. Winlink gateways are not changed.',
+    'lt-ft8': 'Shows FT8 stations reported to PSKReporter, drawn at the middle of their grid square. Off by default. While on, Mesh Tools asks PSKReporter at most once every 5 minutes, for the grid at the middle of the map.',
     'lt:obj-radio': 'Repeater towers, digipeaters, internet gateways and antenna sites that were placed on the map as objects.',
     'lt:obj-wx': 'Weather stations, plus storm, tornado, flood and other weather warnings placed as objects.',
     'lt:obj-event': 'Camps, picnics, parks and other gatherings someone put on the map.',

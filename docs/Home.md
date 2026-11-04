@@ -24,7 +24,7 @@ On a computer you can also use the one-click link in [Installation](Installation
 |---|---|
 | 📡 **Mesh nodes** | Shows MeshCore and Meshtastic radios on the aprs.fi map, alongside the normal APRS stations. MeshCore can be limited by type. Repeaters and room servers that have gone quiet get a gold ring. |
 | 📶 **Coverage** | Shades roughly where a MeshCore repeater (or a spot you choose) can reach over the hills. |
-| 🗺️ **Map layers** | Hides clutter on the aprs.fi map, such as ships, planes, track lines, labels, or APRS objects by type (repeaters, weather, events, and so on). Nothing is deleted. |
+| 🗺️ **Map layers** | Hides clutter on the aprs.fi map, such as ships, planes, track lines, labels, or APRS objects by type. Also Winlink GPS reports and, if you turn it on, FT8 spots. Nothing on aprs.fi is deleted. |
 
 Current version: **1.6.0-beta**. It runs in your web browser through the free **Tampermonkey** extension. It only runs on `aprs.fi` pages.
 
