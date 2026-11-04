@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         aprs.fi Mesh Tools (beta)
 // @namespace    https://greasyfork.org/users/aprsfi-mesh-overlay
-// @version      1.6.1-beta
+// @version      1.6.2-beta
 // @description  One easy panel for aprs.fi: see MeshCore & Meshtastic radios on the map, check roughly where a repeater can reach, and hide map clutter. Bundles Mesh Overlay, Mesh Coverage and Map Layer Toggles.
 // @author       aprsfi-mesh-overlay contributors
 // @license      MIT
@@ -52,7 +52,7 @@
   const performance = globalThis.performance || { now: () => Date.now() };
   const BOOTED = performance.now();
   const W = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : (typeof window !== 'undefined' ? window : globalThis);
-  const VERSION = '1.6.1-beta';
+  const VERSION = '1.6.2-beta';
   const TAG = '[mesh-tools]';
   const WIKI_URL = 'https://github.com/thescrawler/aprsfi-mesh-tools/blob/main/docs/Home.md'; // 📖 Help / Wiki link in Panel settings
 
@@ -1685,6 +1685,36 @@
       if ((len || 4) <= 4) return s;
       return s + String.fromCharCode(65 + Math.floor(((lon + 180) % 2) / 2 * 24)) + String.fromCharCode(65 + Math.floor(((lat + 90) % 1) * 24));
     }
+    function fieldOf(lat, lon) {
+      const lonN = ((lon + 180) % 360 + 360) % 360 - 180;
+      const latN = Math.max(-89.9, Math.min(89.9, lat));
+      return String.fromCharCode(65 + Math.floor((lonN + 180) / 20)) + String.fromCharCode(65 + Math.floor((latN + 90) / 10));
+    }
+    function fieldsInView() {
+      if (!map) return { fields: [], total: 0 };
+      const b = map.getBounds(), west = b.getWest(), east = b.getEast(), south = b.getSouth(), north = b.getNorth(), wrap = west > east;
+      const seen = new Set();
+      const add = (lon, lat) => { const f = fieldOf(lat, lon); if (!seen.has(f)) seen.add(f); };
+      const stepLon = wrap ? [] : [];
+      if (!wrap) { for (let lon = Math.floor((west + 180) / 20) * 20 - 180 + 0.1; lon <= east + 0.1; lon += 20) stepLon.push(lon); }
+      else {
+        for (let lon = west; lon < 180; lon += 20) stepLon.push(lon);
+        for (let lon = -180; lon <= east; lon += 20) stepLon.push(lon);
+      }
+      if (!stepLon.length) stepLon.push((west + east) / 2);
+      for (let lat = Math.floor((Math.max(-90, south) + 90) / 10) * 10 - 90 + 0.1; lat <= north + 0.1 && lat < 90; lat += 10)
+        for (const lon of stepLon) add(lon, lat);
+      add(west, south); add(east, south); add(west, north); add(east, north);
+      const c = map.getCenter();
+      const fields = Array.from(seen);
+      fields.sort((a, f) => {
+        const ac = gridCenter(a + '55'), fc = gridCenter(f + '55');
+        const da = ac ? (ac[0] - c.lat) ** 2 + (ac[1] - c.lng) ** 2 : 0;
+        const df = fc ? (fc[0] - c.lat) ** 2 + (fc[1] - c.lng) ** 2 : 0;
+        return da - df;
+      });
+      return { fields, total: fields.length };
+    }
     function gridCenter(loc) {
       loc = String(loc || '').trim().toUpperCase();
       if (loc.length < 4) return null;
@@ -1750,14 +1780,22 @@
       if (!wrap) return ll[1] >= w && ll[1] <= e;
       return ll[1] >= w || ll[1] <= e;
     }
-    function ft8Status() {
-      const el = $id('lt-ft8-st'); if (!el) return;
-      if (!ft8On) { el.textContent = 'Off. Nothing is downloaded until you turn this on.'; return; }
-      const wait = Math.max(0, FT8_GAP - (Date.now() - ft8At));
-      const mins = Math.ceil(wait / 60000);
+    let ft8Note = '', ft8UiT = null;
+    function ft8Wait() { return ft8At ? Math.max(0, FT8_GAP - (Date.now() - ft8At)) : 0; }
+    function ft8Tick() {
+      const el = $id('lt-ft8-st'), btn = $id('lt-ft8-now');
+      const wait = ft8Wait(), mins = Math.ceil(wait / 60000);
+      if (btn) {
+        btn.disabled = !!(ft8Busy || wait);
+        btn.textContent = ft8Busy ? 'Fetching…' : (wait ? 'Cached, refresh in ' + mins + 'm' : 'Fetch FT8 now');
+      }
+      if (!el) return;
+      if (!ft8On) { el.textContent = 'Off. Nothing is downloaded until you turn this on, or tap Fetch FT8 now.'; return; }
       el.textContent = (ft8Err ? 'Couldn\'t load spots (' + ft8Err + '). ' : (ft8Spots.length + ' spots' + (ft8Grid ? ' from ' + ft8Grid : '') + '. '))
-        + (ft8Busy ? 'Loading…' : 'One check every 5 minutes, for the grid at the middle of the map' + (mins ? ' (next in ' + mins + ' min).' : '.'));
+        + (ft8Note ? ft8Note + ' ' : '')
+        + (ft8Busy ? 'Loading…' : (wait ? 'Cached, refresh available in ' + mins + 'm.' : 'Ready. Background checks stay on the center square.'));
     }
+    function ft8Status() { ft8Tick(); }
     function ft8Popup(rec) {
       return `<div style="font:14px sans-serif;min-width:180px"><b>${esc(rec.call)}</b> <small>FT8</small><br><table style="font-size:12px;margin-top:4px">`
         + `<tr><td style="color:#666;padding-right:6px">Band</td><td>${esc(ft8Band(rec.freq))}</td></tr>`
@@ -1814,31 +1852,57 @@
       const wait = Math.max(1000, FT8_GAP - (Date.now() - ft8At));
       ft8Timer = setTimeout(() => { if (ft8On && map) ft8Fetch(); }, ft8At ? wait : 1000);
     }
+    function ft8Url(grid, secs) {
+      return 'https://retrieve.pskreporter.info/query?modify=grid&callsign=' + encodeURIComponent(grid)
+        + '&mode=FT8&rronly=1&noactive=1&flowStartSeconds=' + secs + '&rptlimit=200&appcontact=' + encodeURIComponent('https://github.com/thescrawler/aprsfi-mesh-tools');
+    }
+    function ft8Save() { try { GM_setValue('ft8_cache', { t: ft8At, grid: ft8Grid, spots: ft8Spots }); } catch (e) { /* */ } }
+    function ft8UiArm() { clearInterval(ft8UiT); if (ft8On) ft8UiT = setInterval(ft8Tick, 30000); }
+    // Background check: one square at the middle of the map. Never overlaps a wider fetch.
     function ft8Fetch() {
       if (!ft8On || !map || ft8Busy) return;
-      if (ft8At && Date.now() - ft8At < FT8_GAP) { ft8Draw(); ft8Status(); ft8Arm(); return; }
-      ft8Busy = true; ft8At = Date.now(); ft8Status(); ft8Arm();
+      if (ft8Wait()) { ft8Draw(); ft8Tick(); ft8Arm(); return; }
       const c = map.getCenter();
-      const grid = maidenhead(c.lat, c.lng, map.getZoom() < 5 ? 2 : 4);
-      ft8Grid = grid;
-      const url = 'https://retrieve.pskreporter.info/query?modify=grid&callsign=' + encodeURIComponent(grid)
-        + '&mode=FT8&rronly=1&noactive=1&flowStartSeconds=-3600&rptlimit=200&appcontact=' + encodeURIComponent('https://github.com/thescrawler/aprsfi-mesh-tools');
-      gmGet(url, 'text', 30000).then(r => {
-        ft8Spots = ft8Parse(r.responseText); ft8Err = '';
-        try { GM_setValue('ft8_cache', { t: ft8At, grid, spots: ft8Spots }); } catch (e) { /* */ }
-      }).catch(e => { ft8Err = friendly(e); }).then(() => { ft8Busy = false; ft8Draw(); ft8Status(); });
+      const grid = maidenhead(c.lat, c.lng, 4);
+      ft8Busy = true; ft8At = Date.now(); ft8Grid = grid; ft8Note = ''; ft8Tick(); ft8Arm();
+      gmGet(ft8Url(grid, -3600), 'text', 30000).then(r => {
+        ft8Spots = ft8Parse(r.responseText); ft8Err = ''; ft8Save();
+      }).catch(e => { ft8Err = friendly(e); }).then(() => { ft8Busy = false; ft8Draw(); ft8Tick(); });
+    }
+    // On demand: 2-letter Maidenhead fields covering the view, one request after another, at most 4.
+    async function ft8FetchNow() {
+      if (!map || ft8Busy) return;
+      if (!ft8On) { ft8On = true; const cb = $id('lt-ft8'); if (cb) cb.checked = true; GM_setValue('lt_show_ft8', true); ft8UiArm(); }
+      if (ft8Wait()) { ft8Tick(); return; }
+      const found = fieldsInView(), take = found.fields.slice(0, 4);
+      ft8Note = found.total > 4 ? 'This view covers ' + found.total + ' fields. Fetched the 4 nearest the center. Zoom in for the rest.' : '';
+      if (!take.length) { ft8Note = 'No grid in view.'; ft8Tick(); return; }
+      ft8Busy = true; ft8At = Date.now(); ft8Err = ''; ft8Arm(); ft8Tick();
+      const merged = new Map();
+      for (let i = 0; i < take.length && ft8On; i++) {
+        ft8Grid = take.slice(0, i + 1).join(' ');
+        ft8Tick();
+        try {
+          const r = await gmGet(ft8Url(take[i], -900), 'text', 30000);
+          for (const s of ft8Parse(r.responseText)) { const prev = merged.get(s.call); if (!prev || s.t >= prev.t) merged.set(s.call, s); }
+        } catch (e) { ft8Err = friendly(e); break; }
+        if (i + 1 < take.length) await new Promise(res => setTimeout(res, 0));
+      }
+      ft8Spots = Array.from(merged.values());
+      ft8Busy = false; ft8Save(); ft8Draw(); ft8Tick();
     }
     function ft8Start() {
       if (!ft8On || !map) { ft8Draw(); ft8Status(); return; }
       const cached = GM_getValue('ft8_cache', null);
       if (cached && cached.t && Date.now() - cached.t < FT8_GAP && Array.isArray(cached.spots)) {
         ft8At = cached.t; ft8Spots = cached.spots; ft8Grid = cached.grid || '';
-        ft8Draw(); ft8Status(); ft8Arm(); return;
+        ft8Draw(); ft8Tick(); ft8Arm(); ft8UiArm(); return;
       }
+      ft8UiArm();
       ft8Fetch();
     }
     function ft8Stop() {
-      clearTimeout(ft8Timer); clearTimeout(ft8MoveT); ft8Timer = null; ft8MoveT = null; ft8Busy = false;
+      clearTimeout(ft8Timer); clearTimeout(ft8MoveT); clearInterval(ft8UiT); ft8Timer = null; ft8MoveT = null; ft8UiT = null; ft8Busy = false;
       if (ft8Layer && map) { map.removeLayer(ft8Layer); ft8Layer = null; }
     }
     let ft8MoveT = null;
@@ -1875,6 +1939,7 @@
         ${stations}
         <label title="FT8 stations from PSKReporter. Off until you turn it on."><input type="checkbox" id="lt-ft8"${ft8On ? ' checked' : ''}><span><b>FT8 spots</b>
           <small>Teal dots at each station's grid square. One download every 5 minutes, only while this is on.</small></span></label>
+        <button type="button" id="lt-ft8-now">Fetch FT8 now</button>
         <div class="info" id="lt-ft8-st"></div>
         <details class="adv"><summary>Advanced: lines, labels &amp; circles</summary>
         ${TOGGLES.filter(t => t[2] === 'overlays').map(row).join('')}
@@ -1893,9 +1958,10 @@
       const ft = $id('lt-ft8');
       ft.addEventListener('change', () => {
         ft8On = ft.checked; GM_setValue('lt_show_ft8', ft8On);
-        if (ft8On) ft8Start(); else { ft8Stop(); ft8Status(); }
+        if (ft8On) ft8Start(); else { ft8Stop(); ft8Tick(); }
       });
-      ft8Status();
+      $id('lt-ft8-now').addEventListener('click', () => ft8FetchNow());
+      ft8Tick();
     }
     return { sectionHtml, wire, init, disable, isActive: () => active, isBusy: () => ft8Busy };
   })();
@@ -2120,7 +2186,8 @@
     'lt:object': 'Things someone placed on the map, such as a net or a repeater object. They are not moving radios. Turn this off to hide every object. The rows under it hide one kind at a time.',
     'lt:winlink': 'GPS position reports that Winlink copies onto APRS. aprs.fi shows them as P in a red diamond, from the station WINLINK to APWL2K. On adds a blue ring and keeps aprs.fi\'s own info box. Off hides those reports. Winlink gateways are not changed.',
     'lt:activity': 'aprs.fi draws these filled squares when you zoom out: blue is quieter, red is busier. Off by default so they do not cover the map. On shows a faint outline only. This is aprs.fi\'s own layer, not FT8.',
-    'lt-ft8': 'Small teal dots for FT8 stations from PSKReporter, under the APRS markers. Zoomed out they group into count bubbles. Off by default. One download every 5 minutes, for the grid at the middle of the map, so panning stays smooth.',
+    'lt-ft8': 'Small teal dots for FT8 stations from PSKReporter, under the APRS markers. Zoomed out they group into count bubbles. Off by default. A quiet background check uses only the square at the middle of the map, at most every 5 minutes.',
+    'lt-ft8-now': 'Downloads FT8 spots for the 2-letter grid fields covering this view, one field at a time, up to 4. PSKReporter asks for 5 minutes between downloads, so the button waits and says when it can run again.',
     'lt:obj-radio': 'Repeater towers, digipeaters, internet gateways and antenna sites that were placed on the map as objects.',
     'lt:obj-wx': 'Weather stations, plus storm, tornado, flood and other weather warnings placed as objects.',
     'lt:obj-event': 'Camps, picnics, parks and other gatherings someone put on the map.',
