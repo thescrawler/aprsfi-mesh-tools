@@ -1,5 +1,8 @@
 # 📝 Changelog
 
+## Nov 4, 2026: 1.6.0-beta
+- **Gone quiet.** MeshCore repeaters and room servers that have not advertised for longer than **Quiet after** get a gold ring. The default is 24 hours. Other choices are 12 hours, 3 days, and 7 days. The popup says **Silent for Xd Yh**. **Gone quiet in view** lists those radios on the map you are looking at. This uses the last-heard time already downloaded. It does not check the network any more often. Turn **Flag gone-quiet repeaters** off to hide the rings and the list.
+
 ## Nov 3, 2026: 1.5.0-beta
 - **Coverage colours are easier to tell apart.** Signal strength used to be a dark and a light shade of the same colour. It is now **green** for strong (at least 10 dB to spare, after the fade margin), **yellow** for fair (5 to 10 dB), and **orange** for weak (0 to 5 dB). Nothing is drawn below 0 dB. The colours also differ in lightness. A **Strong / Fair / Weak** legend sits on the Coverage tab and at the bottom-left of the map while coverage is showing. Older saved maps are worked out again so the new colours apply.
 

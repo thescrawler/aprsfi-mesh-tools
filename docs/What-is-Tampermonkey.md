@@ -79,6 +79,8 @@ Under it, one row per kind. The picture matches the map:
 
 Tap a diamond or dot for its name, when it was last heard, and where it is. On a repeater or room server, the popup also has **Show coverage**.
 
+**Flag gone-quiet repeaters** (on by default) puts a gold ring on repeaters and room servers that have not advertised for a while. **Quiet after** is 12 hours, 24 hours, 3 days, or 7 days. Open **Gone quiet in view** for the names on the map right now. The popup says **Silent for**, with days and hours.
+
 **Advanced** on this tab: hide quiet radios (**Heard from in the last**), draw fewer markers if the phone feels slow, or **Download fresh node lists** if new radios are missing.
 
 ### 6. Coverage: where a signal might reach

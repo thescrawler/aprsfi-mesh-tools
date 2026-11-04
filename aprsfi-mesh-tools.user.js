@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         aprs.fi Mesh Tools (beta)
 // @namespace    https://greasyfork.org/users/aprsfi-mesh-overlay
-// @version      1.5.0-beta
+// @version      1.6.0-beta
 // @description  One easy panel for aprs.fi: see MeshCore & Meshtastic radios on the map, check roughly where a repeater can reach, and hide map clutter. Bundles Mesh Overlay, Mesh Coverage and Map Layer Toggles.
 // @author       aprsfi-mesh-overlay contributors
 // @license      MIT
@@ -50,7 +50,7 @@
   const performance = globalThis.performance || { now: () => Date.now() };
   const BOOTED = performance.now();
   const W = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : (typeof window !== 'undefined' ? window : globalThis);
-  const VERSION = '1.5.0-beta';
+  const VERSION = '1.6.0-beta';
   const TAG = '[mesh-tools]';
   const WIKI_URL = 'https://github.com/thescrawler/aprsfi-mesh-tools/blob/main/docs/Home.md'; // 📖 Help / Wiki link in Panel settings
 
@@ -325,6 +325,20 @@
     for (const [id] of MC_TYPE_ROWS) showType[id] = GM_getValue('show_mc_type_' + id, true) !== false;
     const mcTypeBucket = t => (t === 1 || t === 2 || t === 3 || t === 4) ? t : 0;
     const mcTypeOn = t => !!showType[mcTypeBucket(t)];
+    // Gone quiet uses the last-advert time already on each node. No extra download.
+    const QUIET_H = [12, 24, 72, 168];
+    const QUIET_LABEL = { 12: '12 hours', 24: '24 hours', 72: '3 days', 168: '7 days' };
+    let quietOn = GM_getValue('mc_quiet_on', true) !== false;
+    let quietHours = pick(GM_getValue('mc_quiet_h', 24), QUIET_H, 24);
+    const isRepeaterOrRoom = n => n && n.src === 'meshcore' && (n.typeId === 2 || n.typeId === 3);
+    function silentFor(heard) {
+      const ms = Math.max(0, Date.now() - heard);
+      return Math.floor(ms / 86400000) + 'd ' + Math.floor((ms % 86400000) / 3600000) + 'h';
+    }
+    function isQuiet(n) {
+      if (!quietOn || !isRepeaterOrRoom(n) || !n.heard) return false;
+      return Date.now() - n.heard >= quietHours * 3600000;
+    }
     const MT_COLOR = '#43a047';
     const NAMES = { meshcore: 'MeshCore nodes', meshtastic: 'Meshtastic nodes' };
     const state = {
@@ -449,12 +463,14 @@
     const label = n => n.src === 'meshcore' ? `MeshCore ${n.type}: ${n.name}` : `Meshtastic: ${n.name}`;
     function icon(n) {
       const L = state.L;
-      const k = n.src === 'meshcore' ? 'm' + (n.typeId || 0) : 't';
+      const quiet = isQuiet(n);
+      const k = n.src === 'meshcore' ? 'm' + (n.typeId || 0) + (quiet ? 'q' : '') : 't';
       if (iconCache[k]) return iconCache[k];
       if (n.src === 'meshcore') {
         const c = MC_COLORS[n.typeId] || '#555', letter = { 1: 'C', 2: 'R', 3: 'S', 4: 's' }[n.typeId] || '?';
-        return iconCache[k] = L.divIcon({ className: 'mo-ico', iconSize: [22, 22], iconAnchor: [11, 11],
-          html: `<div style="width:20px;height:20px;background:${c};border:2px solid #fff;transform:rotate(45deg);box-shadow:0 0 2px #000;display:flex;align-items:center;justify-content:center"><b style="transform:rotate(-45deg);color:#fff;font:bold 11px sans-serif">${letter}</b></div>` });
+        const ring = quiet ? '<i style="position:absolute;left:-4px;top:-4px;width:28px;height:28px;box-sizing:border-box;border:3px solid #f9a825;border-radius:4px;transform:rotate(45deg);pointer-events:none"></i>' : '';
+        return iconCache[k] = L.divIcon({ className: 'mo-ico', iconSize: quiet ? [28, 28] : [22, 22], iconAnchor: quiet ? [14, 14] : [11, 11],
+          html: `<div style="position:relative;width:22px;height:22px;margin:${quiet ? '3px' : '0'}">${ring}<div style="width:20px;height:20px;background:${c};border:2px solid #fff;transform:rotate(45deg);box-shadow:0 0 2px #000;display:flex;align-items:center;justify-content:center"><b style="transform:rotate(-45deg);color:#fff;font:bold 11px sans-serif">${letter}</b></div></div>` });
       }
       return iconCache[k] = L.divIcon({ className: 'mo-ico', iconSize: [20, 20], iconAnchor: [10, 10],
         html: `<div style="width:18px;height:18px;border-radius:50%;background:${MT_COLOR};border:2px solid #fff;box-shadow:0 0 2px #000;color:#fff;font:bold 10px sans-serif;display:flex;align-items:center;justify-content:center">M</div>` });
@@ -465,6 +481,7 @@
       if (n.src === 'meshcore') row('Type', n.type);
       else { row('Role', n.role || 'unknown'); if (n.hw) row('Hardware', n.hw); }
       row('Last heard', ago(n.heard) + (n.heard ? ' (' + new Date(n.heard).toLocaleString() + ')' : ''));
+      if (isQuiet(n)) row('Status', 'Silent for ' + silentFor(n.heard));
       row('Position', n.lat.toFixed(5) + ', ' + n.lon.toFixed(5));
       const fields = n.fields || (n.src === 'meshcore' && n.params ? mcFields(n) : []);
       for (const [k, v] of fields) row(k, v);
@@ -488,7 +505,9 @@
     const nodeKey = n => n.key || n.id || (Math.round(n.lat * 1e5) + ',' + Math.round(n.lon * 1e5));
     function makeMarker(n) {
       const L = state.L, key = nodeKey(n);
-      const m = L.marker([n.lat, n.lon], { icon: icon(n), title: label(n), zIndexOffset: 1000, meshKey: key,
+      const q = isQuiet(n);
+      const tip = label(n) + (q ? ' · Silent for ' + silentFor(n.heard) : '');
+      const m = L.marker([n.lat, n.lon], { icon: icon(n), title: tip, zIndexOffset: 1000, meshKey: key, quiet: q,
         meshNode: { src: n.src, public_key: key, type: n.typeId, lat: n.lat, lon: n.lon, name: n.name, heard: n.heard } });
       // Popup HTML is built on open, not for every marker. The lookup sees the latest node after a background refresh.
       m.bindPopup(() => {
@@ -497,7 +516,7 @@
         m.options.meshNode = { src: cur.src, public_key: cur.key || cur.id, type: cur.typeId, lat: cur.lat, lon: cur.lon, name: cur.name, heard: cur.heard };
         return popup(cur);
       }, { maxWidth: 280 });
-      m.bindTooltip(esc(label(n)), { direction: 'top', offset: [0, -10] });
+      m.bindTooltip(esc(tip), { direction: 'top', offset: [0, -10] });
       return m;
     }
     function draw(src) {
@@ -512,8 +531,8 @@
         bag.forEach(m => { if (m !== keep || !state.show[src]) layer.removeLayer(m); });
         if (!state.show[src]) bag.clear();
         else bag.forEach((m, k) => { if (!layer.hasLayer(m)) bag.delete(k); });
-        if (!state.show[src]) return setStatus(src, 'Hidden');
-        if (map.getZoom() < CFG.minZoom) return setStatus(src, 'Zoom in closer to see them');
+        if (!state.show[src]) { if (src === 'meshcore') updateQuietList(null); return setStatus(src, 'Hidden'); }
+        if (map.getZoom() < CFG.minZoom) { if (src === 'meshcore') updateQuietList(null); return setStatus(src, 'Zoom in closer to see them'); }
         return;
       }
       const nodes = state.data[src];
@@ -536,7 +555,7 @@
         const key = nodeKey(n); if (seen.has(key)) continue; seen.add(key);
         vis.push(n);
       }
-      const total = vis.length;
+      const inView = vis, total = vis.length;
       if (vis.length > CFG.maxMarkersPerLayer) {
         const clat = c.lat, clng = c.lng;
         vis.sort((a, z) => ((a.lat - clat) ** 2 + (a.lon - clng) ** 2) - ((z.lat - clat) ** 2 + (z.lon - clng) ** 2));
@@ -548,7 +567,19 @@
       const fresh = [];
       for (const n of vis) {
         const k = nodeKey(n); if (bag.has(k)) {
-          const m = k && bag.get(k); if (m) { const ll = m.getLatLng(); if (Math.abs(ll.lat - n.lat) > 1e-5 || Math.abs(ll.lng - n.lon) > 1e-5) m.setLatLng([n.lat, n.lon]); }
+          const m = bag.get(k);
+          if (m) {
+            const ll = m.getLatLng();
+            if (Math.abs(ll.lat - n.lat) > 1e-5 || Math.abs(ll.lng - n.lon) > 1e-5) m.setLatLng([n.lat, n.lon]);
+            const q = isQuiet(n);
+            if (!!m.options.quiet !== q) {
+              m.options.quiet = q;
+              m.setIcon(icon(n));
+              const tip = label(n) + (q ? ' · Silent for ' + silentFor(n.heard) : '');
+              m.options.title = tip;
+              try { m.setTooltipContent(esc(tip)); } catch (e) { /* */ }
+            }
+          }
           continue;
         }
         fresh.push(n);
@@ -573,6 +604,20 @@
       };
       step();
       setStatus(src, total === 0 ? 'None here' : (total > vis.length ? `${vis.length} nearest of ${total} here` : `${total} here`));
+      if (src === 'meshcore') updateQuietList(inView);
+    }
+    function updateQuietList(inView) {
+      const box = $id('mo-quiet-list'), ul = $id('mo-quiet-ul'), nEl = $id('mo-quiet-n');
+      if (!box || !ul) return;
+      const show = quietOn && state.show.meshcore && state.map && state.map.getZoom() >= CFG.minZoom && inView;
+      box.style.display = show ? '' : 'none';
+      if (!show) return;
+      const quiet = [];
+      for (const n of inView) if (isQuiet(n)) quiet.push(n);
+      quiet.sort((a, b) => (a.heard || 0) - (b.heard || 0));
+      if (nEl) nEl.textContent = String(quiet.length);
+      const top = quiet.slice(0, 30);
+      ul.innerHTML = top.length ? top.map(n => `<li><b>${esc(n.name)}</b> · ${n.typeId === 2 ? 'Repeater' : 'Room'} · Silent for ${silentFor(n.heard)}</li>`).join('') + (quiet.length > top.length ? `<li>…and ${quiet.length - top.length} more</li>` : '') : '<li>None in view.</li>';
     }
     function refresh(force) {
       if (!state.active) return;
@@ -600,6 +645,12 @@
           const c = MC_COLORS[id] || '#555';
           return `<label><input type="checkbox" id="mo-type-${id}"${showType[id] ? ' checked' : ''}><span><i class="mcico" style="background:${c}"><span>${letter}</span></i><b>${name}</b></span></label>`;
         }).join('')}<div class="hint">These only apply while <b>Show MeshCore nodes</b> is on. The picture matches the map icon.</div></div>
+        <div id="mt-mc-quiet" class="obj-groups${state.show.meshcore ? '' : ' dim'}">
+          <label title="Gold ring on repeaters and room servers that have not been heard recently"><input type="checkbox" id="mo-quiet"${quietOn ? ' checked' : ''}><span><b>Flag gone-quiet repeaters</b>
+            <small>A gold ring on repeaters and room servers that have gone silent. Uses the last-heard time already downloaded.</small></span></label>
+          <div class="mt-row" id="mo-quiet-row" title="How long with no advert before a repeater or room is marked silent"><span class="lb">Quiet after</span><select id="mo-quiet-h">${QUIET_H.map(h => `<option value="${h}"${h === quietHours ? ' selected' : ''}>${QUIET_LABEL[h]}</option>`).join('')}</select></div>
+          <details id="mo-quiet-list"><summary>Gone quiet in view (<span id="mo-quiet-n">0</span>)</summary><ul id="mo-quiet-ul"></ul></details>
+        </div>
         <label title="Meshtastic radios reported to meshmap.net"><input type="checkbox" id="mo-cb-meshtastic"><span><b>Show Meshtastic nodes</b> <span style="color:${MT_COLOR}">●M</span>
           <small>Only ones connected to the internet show up.</small><small class="stl" id="mo-st-meshtastic"></small></span></label>
         <div id="mo-err" class="card err" style="display:none"><span class="msg"></span><button type="button" id="mo-retry">↻ Retry</button></div>
@@ -630,6 +681,11 @@
         });
       }
       syncMcTypes();
+      const syncQuiet = () => { const box = $id('mt-mc-quiet'), ob = $id('mo-cb-meshcore'); if (box && ob) box.classList.toggle('dim', !ob.checked); };
+      $id('mo-quiet').addEventListener('change', e => { quietOn = e.target.checked; GM_setValue('mc_quiet_on', quietOn); draw('meshcore'); });
+      $id('mo-quiet-h').addEventListener('change', e => { quietHours = pick(e.target.value, QUIET_H, 24); GM_setValue('mc_quiet_h', quietHours); draw('meshcore'); });
+      syncQuiet();
+      $id('mo-cb-meshcore').addEventListener('change', syncQuiet);
       $id('mo-reload').addEventListener('click', () => refresh(true));
       $id('mo-retry').addEventListener('click', () => { state.error.meshcore = state.error.meshtastic = ''; showError(); refresh(true); });
       $id('mo-age').addEventListener('change', e => { CFG.maxAgeDays = pick(e.target.value, AGE_OPTS, 30); GM_setValue('max_age_days', CFG.maxAgeDays); refresh(); });
@@ -1696,6 +1752,8 @@
     #mt-panel .obj-groups .hint{margin:2px 0 6px;font-size:12px}
     #mt-panel .mcico{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;margin:0 6px 0 0;vertical-align:-3px;border:2px solid #fff;box-shadow:0 0 2px #000;transform:rotate(45deg);flex:none}
     #mt-panel .mcico span{transform:rotate(-45deg);color:#fff;font:bold 9px/1 sans-serif}
+    #mt-panel #mo-quiet-list summary{cursor:pointer;color:var(--mt-acc2);font-size:13px;font-weight:600;padding:4px 0}
+    #mt-panel #mo-quiet-ul{max-height:140px;overflow:auto;margin:4px 0 8px;padding-left:18px;font-size:12px;line-height:1.35}
     #mt-panel .mt-row{all:unset;display:grid!important;grid-template-columns:minmax(0,1fr) var(--mt-cw);align-items:center;column-gap:10px;
       box-sizing:border-box;width:100%;min-width:0;max-width:100%;min-height:var(--mt-h);margin:0!important;padding:4px 0!important;
       float:none;position:static;text-indent:0;font-size:14px;line-height:1.35;color:inherit;text-align:left}
@@ -1817,6 +1875,8 @@
     'mo-type-3': 'Room servers are chat rooms that store messages. They are the purple ◆S diamonds. Hiding them also hides the plain purple room dots.',
     'mo-type-4': 'Sensors report a reading, such as temperature. They are the teal ◆s diamonds.',
     'mo-type-0': 'Any MeshCore radio whose type is not a repeater, companion, room server, or sensor. Shown as a grey ◆?.',
+    'mo-quiet': 'Draws a gold ring around MeshCore repeaters and room servers that have not advertised for longer than Quiet after. The popup says Silent for, with days and hours. No extra download: it uses the last-heard time already saved.',
+    'mo-quiet-row': 'How long a repeater or room server can go without an advert before it is marked gone quiet. Choices are 12 hours, 24 hours, 3 days, and 7 days.',
     'mo-cb-meshtastic': 'Shows Meshtastic radios from meshmap.net. Only radios connected to the internet appear.',
     'mo-age': 'Hides nodes that have not been heard from in this many days, so old or switched-off radios disappear.',
     'mo-max': 'The most nodes drawn at once. Lower this if the map feels slow on your phone.',

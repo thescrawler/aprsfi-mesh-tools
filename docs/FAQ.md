@@ -15,6 +15,9 @@ Yes, but not in Chrome. On **Android**, use Firefox or Microsoft Edge with Tampe
 **Why don't I see my Meshtastic node?**
 Only nodes that reach the internet through MQTT appear on meshmap.net, the source used here. Also check that it was heard within the *Heard from in the last* period.
 
+**What does the gold ring on a repeater mean?**
+That repeater or room server has gone quiet. It has not sent an advert for longer than **Quiet after** on the Mesh nodes tab (24 hours unless you change it). The popup says **Silent for**, with days and hours, for example *Silent for 2d 3h*. Open **Gone quiet in view** for a list of the ones on the map. It uses the last-heard time already downloaded. It does not ask the server any more often.
+
 **Why don't I see my MeshCore node?**
 It must be listed on map.meshcore.io (it has to have advertised a position that reached the map). Also check the *heard* filter and that you're zoomed in to zoom 6 or closer.
 
