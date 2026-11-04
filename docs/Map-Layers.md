@@ -11,7 +11,8 @@ aprs.fi can get crowded. This tab lets you **hide** kinds of things on the map s
 | **Weather** | Weather stations |
 | **Objects** | Every APRS object. The rows under it hide one kind at a time (see below). |
 | **Winlink position reports** | GPS reports that Winlink copies onto APRS (a **P** in a red diamond, sent from **WINLINK** to **APWL2K**). On adds a blue ring and keeps aprs.fi's own info box. Off hides those reports. Winlink gateways are left as they are. |
-| **FT8 spots** | **Off** until you turn it on. Teal dots for FT8 stations from PSKReporter, at the middle of their grid square. |
+| **FT8 spots** | **Off** until you turn it on. Small teal dots for FT8 stations. Zoomed out, they become little count bubbles instead of covering the map. |
+| **Activity squares** | **Off.** These are aprs.fi's own red and blue blocks when you zoom out (busy areas). On shows a faint outline only. |
 | **Items** | APRS items |
 | **AIS ships** | Ships from AIS |
 | **Aircraft (ADS-B)** | Aircraft |
@@ -37,7 +38,9 @@ A real weather station, ship or home station is **not** an object. Those stay on
 
 **Winlink position reports** are only the GPS positions Winlink posts as APRS objects. aprs.fi already shows who they are and when they were heard, so Mesh Tools does not replace that box. It only adds a blue ring, or hides them if you turn the switch off. A Winlink gateway (a station that is itself a gateway) is not one of these reports, and this switch does not hide it.
 
-**FT8 spots** stays off until you turn it on. Then Mesh Tools asks [PSKReporter](https://www.pskreporter.info/pskdev.html) for FT8 reports in the grid square at the middle of the map (`modify=grid`, mode FT8, about the last hour). PSKReporter asks apps not to query more than once every 5 minutes, so Mesh Tools waits at least that long, and it remembers the last answer so a reload in that window does not ask again. Zoomed far out, it uses the wider 2-letter grid. Each dot is the middle of the station's grid square, not a precise GPS fix. Tap a dot for the callsign, band and frequency, SNR, time, and who heard them. **Show all** does not turn this on, because it downloads from another site.
+The big red and purple squares you see when zoomed out are **aprs.fi's own "most active areas"** layer (blue means quieter, red means busier). Mesh Tools does not draw them. **Activity squares** is off, so those fills are hidden and the map stays readable. Turn it on for a light outline of the same squares.
+
+**FT8 spots** stays off until you turn it on. Then Mesh Tools asks [PSKReporter](https://www.pskreporter.info/pskdev.html) once for the grid at the middle of the map (`modify=grid`, mode FT8, about the last hour). Asking for every square in view would stall the page, so it does not. PSKReporter allows one query every 5 minutes; the answer is saved and reused, including after a reload. Moving the map waits a moment, then redraws from that saved list. Zoomed in, stations are small teal dots under the APRS markers (at most a few hundred). Zoomed out, each grid becomes one count bubble. Tap for the callsign, band, SNR, time, and who heard them. The position is the middle of the grid square, not a GPS fix. **Show all** does not turn this on.
 
 ## Advanced
 

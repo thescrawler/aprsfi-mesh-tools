@@ -1,5 +1,9 @@
 # 📝 Changelog
 
+## Nov 4, 2026: 1.6.1-beta
+- **The red and purple squares are aprs.fi's, not FT8.** When you zoom out, aprs.fi paints "most active areas" (blue quieter, red busier). **Activity squares** is off, so that fill is hidden. Turn it on for a faint outline only.
+- **FT8 stays light.** Zoomed in, stations are small teal dots drawn under the APRS and MeshCore markers. Zoomed out, each grid is one count bubble, and at most a few hundred are drawn. The download is still one grid at the middle of the map, at most every 5 minutes, and only while FT8 spots is on. Moving the map waits a moment before redrawing, so the page does not stall.
+
 ## Nov 4, 2026: 1.6.0-beta
 - **Gone quiet.** MeshCore repeaters and room servers that have not advertised for longer than **Quiet after** get a gold ring. The default is 24 hours. Other choices are 12 hours, 3 days, and 7 days. The popup says **Silent for Xd Yh**. **Gone quiet in view** lists those radios on the map you are looking at. This uses the last-heard time already downloaded. It does not check the network any more often. Turn **Flag gone-quiet repeaters** off to hide the rings and the list.
 - **Winlink position reports.** GPS reports that Winlink copies onto APRS (source **WINLINK**, destination **APWL2K**, the P in a red diamond) get a blue ring. The switch shows or hides them. aprs.fi's own info box is left as it is. Winlink gateways are not touched. No extra download.
