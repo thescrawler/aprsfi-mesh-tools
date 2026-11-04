@@ -18,8 +18,11 @@ Only nodes that reach the internet through MQTT appear on meshmap.net, the sourc
 **What is the blue ring on a red diamond with P?**
 That is a Winlink GPS position report. Winlink copies it onto APRS as an object from the station **WINLINK** to **APWL2K**. aprs.fi already shows the details, including when it was heard, so Mesh Tools does not replace that box. The **Winlink position reports** switch on the Map layers tab hides those reports. A Winlink gateway is a different station and stays on the map.
 
+**What are the big red and purple squares when I zoom out?**
+Those are aprs.fi's own activity squares (blue is quieter, red is busier). Mesh Tools does not draw them. **Activity squares** on the Map layers tab is off, so the fill is hidden. Turn it on if you want a faint outline instead.
+
 **What are the teal FT8 dots?**
-Stations that PSKReporter heard on FT8, drawn at the middle of their grid square (not an exact location). The switch is **off** until you turn it on. Mesh Tools then asks PSKReporter at most once every 5 minutes, which is as often as they allow. Tap a dot for the callsign, band, signal report, time, and who heard them.
+Stations that PSKReporter heard on FT8. Zoomed in they are small dots, drawn under the APRS and MeshCore markers. Zoomed out they become a count bubble per grid so they do not cover the map. The position is the middle of the grid square, not an exact location. The switch is **off** until you turn it on. Mesh Tools then asks PSKReporter at most once every 5 minutes, for the grid at the middle of the map, which is as often as they allow. Tap a dot for the callsign, band, signal report, time, and who heard them.
 
 **What does the gold ring on a repeater mean?**
 That repeater or room server has gone quiet. It has not sent an advert for longer than **Quiet after** on the Mesh nodes tab (24 hours unless you change it). The popup says **Silent for**, with days and hours, for example *Silent for 2d 3h*. Open **Gone quiet in view** for a list of the ones on the map. It uses the last-heard time already downloaded. It does not ask the server any more often.
