@@ -2,11 +2,11 @@
 
 ## The panel
 
-The **🛰️ Mesh Tools** panel opens in the **bottom-right corner** of aprs.fi (320 px wide, narrower on small screens). It has three tabs: **📡 Mesh nodes**, **📶 Coverage** and **🗺️ Map layers**. It remembers which tab you used last.
+The **🛰️ Mesh Tools** panel opens in the **bottom-right corner** of aprs.fi. On a computer it is a narrow column. On a phone it uses most of the screen width. It has three tabs: **📡 Mesh nodes**, **📶 Coverage** and **🗺️ Map layers**. It remembers which tab you used last.
 
 - **Collapse / open:** tap the panel header (the title bar). The ▾ arrow turns to ▸ when collapsed.
 - **Advanced:** each tab keeps less-used settings inside a folded **Advanced** section. Tap it to open.
-- **Touch friendly:** on touch screens the buttons, menus and boxes get taller (about 40 px), so they're easier to hit.
+- **Touch friendly:** on a phone the buttons, menus and boxes get taller, so they're easier to hit.
 - **Welcome tip:** a short tip appears the first time. Tap **Got it** to hide it. Bring it back with **Show tips again**.
 
 ## Moving the panel

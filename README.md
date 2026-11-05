@@ -18,36 +18,17 @@ On a computer you can also click the one-click link below. Edge, Kiwi, and iPhon
 
 **New here?** [What is Tampermonkey?](docs/What-is-Tampermonkey.md) explains the free browser add-on, then how to open aprs.fi and use the panel.
 
-A Tampermonkey userscript that adds **MeshCore and Meshtastic nodes**, **terrain-based coverage estimates** and **map layer toggles** to [aprs.fi](https://aprs.fi), all in one touch-friendly panel.
+A small add-on, run by Tampermonkey, that adds **MeshCore and Meshtastic radios**, a **hill-based coverage estimate**, and **map layer switches** to [aprs.fi](https://aprs.fi), all in one panel that works on a phone.
 
 <img src="docs/img/phone-coverage.png" alt="Mesh Tools coverage panel on a phone" width="320">
 
-## Install
+## Install on a computer
 
-1. Install [Tampermonkey](https://www.tampermonkey.net/). On Chrome/Edge, also turn on **Allow User Scripts** in the extension's details ([how](docs/Installation.md)).
-2. **[👉 One-click install aprs.fi Mesh Tools](https://github.com/thescrawler/aprsfi-mesh-tools/raw/main/aprsfi-mesh-tools.user.js)**
-3. Open <https://aprs.fi>. The 🛰️ Mesh Tools panel appears in the bottom-right corner.
+1. Install [Tampermonkey](https://www.tampermonkey.net/). On Chrome or Edge, also turn on **Allow User Scripts** in the extension's details. [How](docs/Installation.md).
+2. **[Install aprs.fi Mesh Tools](https://github.com/thescrawler/aprsfi-mesh-tools/raw/main/aprsfi-mesh-tools.user.js)**
+3. Open <https://aprs.fi>. The Mesh Tools panel appears in the bottom-right corner.
 
-**On a phone?** Chrome on a phone can't run extensions. On Android, install Tampermonkey in **Firefox** or **Microsoft Edge**. On iPhone or iPad, install the **Tampermonkey** app, then turn it on in **Settings**, **Safari**, **Extensions** and allow all websites. Then add the script like this:
-
-1. Long-press the link below and choose **Copy link** (or copy it from the box).
-
-```
-https://raw.githubusercontent.com/thescrawler/aprsfi-mesh-tools/main/aprsfi-mesh-tools.user.js
-```
-
-2. Open Tampermonkey's **Dashboard**. Menus vary a little.
-   - **Firefox (Android):** tap the **⋮** menu, then **Extensions** (older Firefox says **Add-ons**), then **Tampermonkey**. Or tap the Tampermonkey icon, then **Dashboard**.
-   - **Edge (Android):** usually the **⋮** menu, then **Extensions**, then **Tampermonkey**, then **Dashboard**.
-   - **Kiwi:** the same idea as Edge, if you already have it. Tampermonkey says Kiwi is no longer updated, so Firefox or Edge is safer.
-   - **iPhone / iPad:** in Safari, usually the puzzle-piece or **aA** button, then **Tampermonkey**, then **Dashboard**. The Tampermonkey app has to be turned on for Safari first (see the link above).
-3. At the top of the Dashboard, tap the **Utilities** tab. On a small screen, slide that tab row sideways until you see **Utilities**. If the tab is missing, Tampermonkey's help says to set **Config mode** to **Beginner** or **Advanced**.
-4. Find **Import from URL**, paste the link, and tap **Install**.
-5. Tap **Install** again on the next screen, then open <https://aprs.fi>.
-
-[Details](docs/Installation.md#installing-on-a-phone)
-
-Tampermonkey keeps it updated automatically from this repository. A Greasy Fork listing is coming later.
+Edge, Kiwi, and iPhone steps are on the [Installation](docs/Installation.md#installing-on-a-phone) page. Tampermonkey checks for updates from this repository. A Greasy Fork listing is coming later.
 
 ## Documentation
 
@@ -57,7 +38,7 @@ Tampermonkey keeps it updated automatically from this repository. A Greasy Fork 
 
 ## Beta
 
-This is **beta** software. Coverage is a bare-earth signal-strength *estimate* only (terrain diffraction plus a typical LoRa link budget). Trees and buildings are not modelled. Please report problems in [Issues](https://github.com/thescrawler/aprsfi-mesh-tools/issues).
+This is **beta** software. Coverage is an estimate from the shape of the hills, plus a typical MeshCore radio. Trees and buildings are not included. Please report problems in [Issues](https://github.com/thescrawler/aprsfi-mesh-tools/issues).
 
 Not affiliated with aprs.fi, MeshCore or Meshtastic.
 

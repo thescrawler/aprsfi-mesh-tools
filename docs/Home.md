@@ -2,21 +2,9 @@
 
 **New here?** Start with [What is Tampermonkey](What-is-Tampermonkey.md). It explains the add-on in plain language, then how to find the panel and use each tab.
 
-## 📲 Install (easiest way, works on phones)
-Firefox on Android is the usual way. Copy this link, open Tampermonkey's **Utilities** page, then use **Import from URL**.
+## Install
 
-```
-https://raw.githubusercontent.com/thescrawler/aprsfi-mesh-tools/main/aprsfi-mesh-tools.user.js
-```
-
-1. Long-press the link and choose **Copy link** (or copy it from the box).
-2. In Firefox, tap the menu (the three dots), then **Extensions**. Older Firefox says **Add-ons**. Tap **Tampermonkey**. If you already see a Tampermonkey icon, tap that instead.
-3. Tap **Dashboard**.
-4. At the top of the Dashboard, tap the **Utilities** tab. On a small screen those tabs sit in a row you can slide sideways until **Utilities** shows. Tampermonkey's own help says: if that tab is missing, set **Config mode** to **Beginner** or **Advanced**.
-5. Find **Import from URL**, paste the link, and tap **Install**.
-6. Tap **Install** again on the next page.
-
-On a computer you can also use the one-click link in [Installation](Installation.md). Edge, Kiwi, and iPhone are a little different: [phone steps](Installation.md#installing-on-a-phone).
+The full steps, including phones, live on the [Installation](Installation.md) page. On a phone, Firefox for Android plus **Import from URL** is the usual way. On a computer, use the one-click link on that page. Edge, Kiwi, and iPhone are in [Installing on a phone](Installation.md#installing-on-a-phone).
 
 **aprs.fi Mesh Tools** is a free add-on (a *userscript*) for the [aprs.fi](https://aprs.fi) map. It adds one small panel to the map with three tools:
 
@@ -28,7 +16,7 @@ On a computer you can also use the one-click link in [Installation](Installation
 
 Current version: **1.6.3-beta**. It runs in your web browser through the free **Tampermonkey** extension. It only runs on `aprs.fi` pages.
 
-> **Beta software.** Coverage is an *estimate* from hills only. It does not include trees, buildings, or your radio's power and antenna gain. Read [How the coverage estimate works](Coverage.md#how-the-estimate-works) before relying on it.
+> **Beta software.** Coverage is an *estimate* from the shape of the hills. It does not include trees or buildings. Signal strength uses a typical radio power and antenna gain, which you can change. Read [How the coverage estimate works](Coverage.md#how-the-estimate-works) before relying on it.
 
 ## Quick links
 

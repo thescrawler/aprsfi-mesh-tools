@@ -33,14 +33,14 @@ If you accidentally installed Mesh Tools twice, only the first copy runs. Delete
 
 ## I turned off MeshCore, but red dots are still on the map
 
-Those plain red circles are repeater dots drawn by the Coverage tab (purple ones are chat rooms), not the ◆R markers. Update to **1.2.1-beta** or newer and reload aprs.fi. **Show MeshCore nodes** then hides them too, including when you are zoomed out. A repeater you already tapped **Show coverage** on, and any pin you dropped, stays put.
+Those plain red circles are repeater dots drawn by the Coverage tab (purple ones are chat rooms), not the ◆R markers. **Show MeshCore nodes** hides them too, including when you are zoomed out. A repeater you already tapped **Show coverage** on, and any pin you dropped, stays put. If the dots stay after a reload, update the script. The version under **⚙ Panel settings** should be **1.6.3-beta**.
 
 ## No mesh nodes on the map
 
 - **Zoom in.** Nodes only show at map zoom 6 or closer.
 - **Check the switches** *Show MeshCore nodes* / *Show Meshtastic nodes*. Under MeshCore, **Repeaters**, **Companions**, **Room servers**, or **Sensors** may be off on their own.
 - **Raise "Heard from in the last"** (Advanced) to 30 or 90 days. Quiet nodes may be filtered out.
-- **First visit is slower than the next one.** The MeshCore list is a large download the first time. From **1.3.1-beta**, later visits draw the saved list immediately. If nodes are still missing, wait for the status line to leave *Loading…*, or tap **⟳ Download fresh node lists**.
+- **First visit is slower than the next one.** The MeshCore list is a large download the first time. Later visits draw the saved list immediately. If nodes are still missing, wait for the status line to leave *Loading…*, or tap **⟳ Download fresh node lists**.
 - **Meshtastic:** only internet/MQTT-connected nodes are on meshmap.net. Many real radios won't appear.
 - **Allow the connection.** If Tampermonkey asked to allow `map.meshcore.io` or `meshmap.net` and you clicked *Forbid*, open the Tampermonkey **Dashboard**, then the script, then **Settings**, and remove the blocked domain or add it to the allowed list (or reinstall).
 - **Red error box?** Tap **↻ Retry**, or **⟳ Download fresh node lists** under Advanced. The source site may be temporarily down.
@@ -58,7 +58,7 @@ There are more nodes in view than *Most nodes to draw* allows, so the ones neare
 
 ## Coverage is very slow
 
-- Update to **1.1.2-beta** or newer. Older versions could take a minute or more per map in Chrome with Tampermonkey (see the [Changelog](Changelog.md)). A 50 mi map should now take a few seconds the first time and be near-instant after that.
+- Check the version under **⚙ Panel settings**. It should be **1.6.3-beta**. Very old copies could take a minute or more per map in Chrome. A 50 mile map should now take a few seconds the first time and be near-instant after that. See the [Changelog](Changelog.md).
 - Use **Terrain detail: Fast** or **Balanced**, and a smaller **Farthest distance**.
 - Turn off **Show ALL nearby repeaters**.
 - Use **Smoothness 180** and turn off **Strict mode**.
@@ -84,16 +84,17 @@ Map layers depend on aprs.fi's internal map code. If aprs.fi changed it, please 
 ## An object is still showing after I hid its type
 
 - **Objects** (the row above the pictures) must be on for the type rows to do anything. If it is off, every object is hidden.
-- The type rows only affect **APRS objects**, things someone placed on the map. A home station or weather station that uses a similar icon stays on its own row (**Fixed stations**, **Weather**, and so on).
+- The type rows only affect **APRS objects**, things someone placed on the map. A home station or weather station that uses a similar icon stays on its own row (**Fixed stations**, **Weather stations**, and so on).
 - A symbol with a letter or number on top is grouped with the alternate symbol underneath. A repeater tower is the plain tower symbol. The same picture with a letter on it may be a different kind of object, and can land in **Other objects**.
-- Update to **1.3.0-beta** or newer if the type rows are missing.
+- If the type rows are missing, update the script. Current version is **1.6.3-beta**.
 
 ## The panel covers something I need
 
 Drag the **⠿ drag to move** bar, or tap the header to collapse the panel. Double-tap the bar to send it back to the corner.
 
 ## A repeater's info box closes when I move the mouse to it
-Fixed in 1.1.3-beta. Before that, the first click on a repeater often opened the box and then closed it right away, so you had to click twice. Update the script (Tampermonkey → Utilities → Check for updates) and one click will work.
+
+That was fixed a while ago. One click should open the box and leave it open. If it still closes, update the script: Tampermonkey **Dashboard**, then **Trigger update** (or open the install link again). The version under **⚙ Panel settings** should be **1.6.3-beta**.
 
 ## Reporting a problem
 

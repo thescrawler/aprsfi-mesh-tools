@@ -54,17 +54,17 @@ Open **🗺️ Map layers** when the map is too busy.
 
 Switches turn kinds of aprs.fi markers **off or on**. Nothing is deleted. Turn a switch back on and those markers return.
 
-- **Moving stations**, **Fixed stations**, **Weather**, **Objects**, **Winlink position reports**, **Items**, **AIS ships**, **Aircraft**.
+- **Moving stations**, **Fixed stations**, **Weather stations**, **Objects**, **Winlink position reports**, **Items**, **AIS ships** (boats), **Aircraft (ADS-B)** (planes).
 - **Winlink position reports** are GPS positions Winlink posts onto APRS (a P in a red diamond). On, they get a blue ring and keep aprs.fi's own info box. Off, those reports hide. Winlink gateways stay either way.
-- **Activity squares** is off. Those are aprs.fi's red and blue blocks when you zoom out, not Mesh Tools. Turn the switch on only if you want a faint outline of them.
-- **FT8 spots** is off until you turn it on. Zoomed in, stations are small teal dots under the other markers. Zoomed out, they become count bubbles so they do not cover the map. Nothing downloads until you tap **Fetch FT8 now**, which loads the 2-letter fields in view (up to 4), then waits 5 minutes.
+- **Activity squares** starts **off**. Those are aprs.fi's red and blue blocks when you zoom out, not dots Mesh Tools draws. Turn the switch on only if you want a faint outline of them.
+- **FT8 spots** starts **off**. Turning it on does not download anything. Tap **Fetch FT8 now** to load spots from the last 15 minutes. It asks for up to 4 big grid fields you can see (two letters, such as EM), the ones nearest the middle of the map, then the button waits 5 minutes. Zoomed in, stations are small teal dots. Zoomed out, they become count bubbles.
 - Under **Objects**, extra rows hide one kind of object: repeater towers, weather alerts, events, emergency markers, plain dots, and anything else. Each row shows the same little picture aprs.fi uses.
-- **Show all** and **Hide all** flip every switch at once.
+- **Show all** and **Hide all** flip the map-layer switches, including **Activity squares**. They do not turn **FT8 spots** on or off.
 - **Advanced** hides labels, track lines, old-position dots, direction lines, and range circles.
 
 ### 5. Mesh nodes: see radios
 
-Open **📡 Mesh nodes**, then **zoom in**. Radios appear at about a state or region view (map zoom 6 or closer). Further out, the line under the switch says to zoom in.
+Open **📡 Mesh nodes**, then **zoom in**. Radios appear when the map is about a state or region (aprs.fi zoom 6 or closer). Further out, the line under the switch says **Zoom in closer to see them**.
 
 **Show MeshCore nodes** is the master switch. Off means no MeshCore diamonds, and no plain red or purple dots from Coverage either.
 
@@ -78,7 +78,7 @@ Under it, one row per kind. The picture matches the map:
 | **Sensors** | Teal **◆s**. |
 | **Other / unknown** | Grey **◆?**, if a radio’s type is none of the above. |
 
-**Show Meshtastic nodes** shows green **●M** dots. Only Meshtastic radios that reach the internet appear.
+**Show Meshtastic nodes** shows green **●M** dots. Only Meshtastic radios that reach the internet appear. A radio that stays on a local chat, with no path to the internet, is not in that list.
 
 Tap a diamond or dot for its name, when it was last heard, and where it is. On a repeater or room server, the popup also has **Show coverage**.
 
