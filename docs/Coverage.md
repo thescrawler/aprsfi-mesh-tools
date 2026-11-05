@@ -27,7 +27,7 @@ If the 📡 Mesh nodes tab is showing MeshCore nodes, the coverage controls appe
 | **"N picked" / None picked yet**, **Clear** | How many repeaters you've picked with *Show coverage*. **Clear** un-picks them all. |
 | **📍 Drop a pin to test a spot** | Tap it, then tap the map to place one pin (tap the button again to cancel). You can keep up to **10 pins**. Adding an 11th removes the oldest. |
 | **Remove my pins** | Deletes every pin and its shading. |
-| **Map shows** | **Signal strength** (default, since 1.1.0): estimates how strong the repeater would be, including signal bending over hills. **Clear view only**: the older method, which shades only places with a straight, unblocked line to the repeater. |
+| **Map shows** | **Signal strength** (the default): estimates how strong the repeater would be, including signal bending over hills. **Clear view only**: shades only places with a straight, unblocked line to the repeater. |
 
 ### Repeater popup (📶 Coverage section)
 
@@ -49,7 +49,7 @@ If the 📡 Mesh nodes tab is showing MeshCore nodes, the coverage controls appe
 
 ## Advanced settings (every setting in depth)
 
-All settings are remembered. Changing any setting marked ♻️ throws away what's drawn and recomputes with the new value.
+All settings are remembered. Changing **Repeater height**, **Your height**, **Farthest distance**, **Terrain detail**, **Smoothness**, **Repeater power**, **Antenna gain**, **Fade margin**, or **Strict mode** throws away what is drawn and works it out again.
 
 ### Show ALL nearby repeaters (slow)
 Default **off**. When on, coverage is drawn automatically for the **nearest 25** repeaters/room servers around the middle of the map, as well as anything you picked. It updates as you move the map, and the status says e.g. *Showing 25 (nearest 25 of 140)*. On phones this can take a long time and use a lot of data, especially with high Terrain detail.
@@ -60,15 +60,15 @@ Both default **on**. These choose which kinds of MeshCore nodes count as "nearby
 ### Heard in the last
 **7, 30 (default), 90 days.** Repeaters not heard from in this many days are ignored when finding "nearby" ones, so dead repeaters are skipped. This is separate from the Mesh nodes tab's own *Heard from in the last* setting.
 
-### ♻️ Repeater height
+### Repeater height
 Default **10 ft (3 m)**. How high repeater antennas are above the ground, used for any repeater or pin without its own height. Type any value from **1 ft to 328 ft (0.3–100 m)**. A value outside that range shows a red warning and is not saved. Higher antennas see over more hills, so coverage grows.
 
-### ♻️ Your height
+### Your height
 Default **7 ft (2 m)**. How high **your** radio's antenna is at the receiving end. Every shaded spot means "a radio held this high here could probably hear the repeater". Use about 6 ft for a handheld, more for a car roof or house antenna. Same 0.3–100 m limits.
 
 The **ft / m** picker next to either height box switches units for *all* heights everywhere (panel and popups). Heights are stored in metres, so switching units never changes the real value. Feet show as whole numbers, and metres to one decimal place.
 
-### ♻️ Farthest distance
+### Farthest distance
 How far from the repeater to check. Choose **mi** (default) or **km**:
 
 - miles: 5, 10, **20**, 30, 50
@@ -76,7 +76,7 @@ How far from the repeater to check. Choose **mi** (default) or **km**:
 
 Default is **20 mi (≈32 km)**. Bigger distances take longer and download more terrain. Switching unit snaps to the nearest preset in the new unit. Popups and pin ranges use the same unit.
 
-### ♻️ Terrain detail
+### Terrain detail
 How finely the hills are measured. Each level loads terrain tiles at a different zoom and checks the ground at a matching spacing along each ray:
 
 | Level | Tile zoom | Ground checked every | Tiles for 5 / 10 / 20 / 30 / 50 mi* |
@@ -88,18 +88,18 @@ How finely the hills are measured. Each level loads terrain tiles at a different
 \*Measured at about 46° N. Tile counts vary a little with location.
 
 - **Tile cap:** one coverage may use at most **480 tiles**. If the chosen level would need more, Mesh Tools steps down one level at a time until it fits, and the status line adds *"(area too big for this detail, using lower)"*. So at 50 mi every level actually uses Fast.
-- **Download size:** each tile is roughly 60–130 KB. At 20 mi that's about 4 MB (Fast), 12 MB (Balanced) and 40–50 MB (Sharp). Tiles are downloaded **6 at a time**, and progress shows as *Loading terrain x/y*.
-- **Rough first-load times** on typical home broadband, for 20 mi: Fast a few seconds, Balanced ~5–15 s, Sharp ~20–60 s. Phones on mobile data can be much slower. Tiles already in memory (up to 600) are reused, so the next repeater nearby is quicker.
+- **Download size:** each tile is roughly 60–130 KB. At 20 mi that's about 4 MB (Fast), 12 MB (Balanced) and 40–50 MB (Sharp). Tiles are downloaded **12 at a time**, and progress shows as *Loading terrain x/y*.
+- **Rough first-load times** on typical home broadband, for 20 mi: Fast a few seconds, Balanced ~5–15 s, Sharp ~20–60 s. Phones on mobile data can be much slower. Up to 600 tiles stay in memory, so the next repeater nearby is quicker. A larger set (up to 900) is also saved in the browser. See [Privacy and data sources](Privacy-and-Data-Sources.md).
 - Sharp catches small ridges and valleys that Fast smooths over, so it's more accurate in rugged country. On flat land the difference is small.
 
-### ♻️ Repeater power
-Default **22 dBm** (the usual MeshCore repeater setting). Choices: 14, 17, 20, 22, 27, 30 dBm. Only used by *Signal strength*.
+### Repeater power
+Default **22 dBm** (the usual MeshCore repeater setting). Choices: 14, 17, 20, 22, 27, 30 dBm. dBm is transmit power. 30 dBm is 1 watt. 20 dBm is a tenth of a watt. Only used by *Signal strength*.
 
-### ♻️ Antenna gain (each)
-Default **3 dBi**, applied to both the repeater and your radio. Choices: 0, 2, 3, 5, 6, 8 dBi. Only used by *Signal strength*.
+### Antenna gain (each)
+Default **3 dBi**, applied to both the repeater and your radio. Choices: 0, 2, 3, 5, 6, 8 dBi. dBi is how much the antenna focuses the signal compared with a plain antenna. Only used by *Signal strength*.
 
-### ♻️ Fade margin (dB)
-*New in 1.2.0.* Default **10**. Choices: 0, 5, 10, 15, 20. Only used by *Signal strength*.
+### Fade margin (dB)
+Default **10**. Choices: 0, 5, 10, 15, 20. Only used by *Signal strength*. A dB (decibel) is a way to say how much stronger one signal is than another. Bigger means more spare signal.
 
 Think of it as a **safety cushion**. Radio signals don't stay perfectly steady: they rise and fall as people walk by, trucks pass, leaves move, the weather changes, or you hold the radio differently. A spot that only *just* gets a signal on paper will often drop out in real life. The fade margin asks the map to keep this many dB in reserve before it calls a spot covered.
 
@@ -109,11 +109,11 @@ Think of it as a **safety cushion**. Radio signals don't stay perfectly steady: 
 
 Every 3 dB is roughly half or double the signal power, so 10 dB is about a tenth of the power held back as a cushion.
 
-### ♻️ Smoothness
+### Smoothness
 **180** or **360 (default)** directions (rays) are checked around each repeater, i.e. one every 2° or every 1°. More rays give smoother edges, but take longer to compute.
 
-### ♻️ Strict mode (Fresnel 60%)
-Only used by *Clear view only*. Default **off**. Normal mode only asks "can the two antennas *see* each other over the hills?". Strict mode also requires **60% of the first Fresnel zone** to be clear. That's the football-shaped region around the direct line that radio waves need for a strong signal, worked out for **915 MHz**. It is more realistic for a reliable link, and shows **less** coverage. It is also slower, especially at Sharp detail.
+### Strict mode (Fresnel 60%)
+Only used by *Clear view only*. Default **off**. Normal mode only asks "can the two antennas see each other over the hills?". Strict mode also requires **60% of the first Fresnel zone** to be clear. That zone is the football-shaped space around the straight line. Radio waves need that space for a solid link. The check uses **915 MHz** (a frequency near the MeshCore band). It shows **less** coverage, and it is slower, especially at Sharp detail.
 
 ### Clear saved results
 Throws away saved coverage results, the saved repeater list, and terrain tiles saved in the browser. Everything is then worked out and downloaded again. Use it if something looks wrong or stuck.
@@ -121,6 +121,10 @@ Throws away saved coverage results, the saved repeater list, and terrain tiles s
 ---
 
 ## How the estimate works
+
+In plain terms: the tool looks up the height of the ground, imagines your antenna and the repeater's antenna, and asks whether the hills between them block the path. **Signal strength** (the usual choice) then guesses how much signal would be left, and paints green, yellow, or orange. **Clear view only** only asks whether the hills block a straight line.
+
+The steps below are the same maths the script runs. You can skip them and still use the map.
 
 For each repeater or pin:
 
@@ -135,7 +139,9 @@ For each repeater or pin:
 
 Results are saved (in Tampermonkey's storage) for the **60 most recently computed** repeater/setting combinations, so reloading the page redraws them instantly. Changing a setting that affects the result gives a new combination, which is computed fresh.
 
-### Signal strength mode (default since 1.1.0)
+### Signal strength mode
+
+This is the default. **LoRa** here means the kind of radio MeshCore uses. The script compares the repeater's power with how weak a signal that radio can still hear.
 
 Steps 1 to 4 are the same. Then, every few hundred metres along each ray, the script works out how much signal would be left:
 

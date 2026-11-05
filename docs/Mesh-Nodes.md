@@ -4,7 +4,7 @@ This tab puts **MeshCore** and **Meshtastic** radios on the aprs.fi map, next to
 
 ## What you see on the map
 
-Nodes only appear once you're **zoomed in to zoom level 6 or closer** (roughly a region or state). Further out, the status line says *"Zoom in closer to see them"*.
+Nodes only appear once you are **zoomed in to about a state or region** (aprs.fi calls this zoom 6 or closer). Further out, the status line says *"Zoom in closer to see them"*.
 
 ### MeshCore (diamonds ◆)
 
@@ -18,13 +18,13 @@ Nodes only appear once you're **zoomed in to zoom level 6 or closer** (roughly a
 
 ### Meshtastic (green dots ●M)
 
-Every Meshtastic node is a green circle with **M**. Only nodes whose position reaches the internet (through an MQTT gateway) are listed on meshmap.net, so many local Meshtastic radios **won't** appear.
+Every Meshtastic node is a green circle with **M**. Only nodes whose position reaches the internet are listed on meshmap.net. That path is often called MQTT: the radio (or a gateway near it) sends its position out to the internet. Many local Meshtastic radios **won't** appear.
 
 ### Node popups
 
 Tap or click any node to see its details:
 
-- **MeshCore:** type, last heard (as "x min/hours/days ago" plus the date and time), position, frequency, radio settings (bandwidth, spreading factor, coding rate), how it was reported, first-seen date, and a short ID (the first 12 characters of its public key).
+- **MeshCore:** type, last heard (as "x min/hours/days ago" plus the date and time), position, frequency, radio settings (how wide the signal is, and the speed setting), how it was reported, first-seen date, and a short ID. The short ID is the first 12 characters of the radio's public key, which is a long number that identifies that radio.
 - **Meshtastic:** role, hardware model, last heard, position, short name, region, modem preset, firmware, altitude, battery (or "plugged in"), nodes nearby, how many internet gateways heard it, and its `!xxxxxxxx` ID.
 
 For MeshCore **repeaters and room servers**, the popup also has a **📶 Coverage** section, so you can show coverage straight from here. See [Coverage](Coverage.md).

@@ -1,20 +1,25 @@
 # 📝 Changelog
 
+Current version: **1.6.3-beta**. Each note below is what changed in that version. If a later note changes the same feature, follow the later note.
+
+## Nov 5, 2026: docs
+- The guide now matches 1.6.3-beta: FT8 only when you tap **Fetch FT8 now** (up to 4 two-letter fields), **Activity squares** off unless you turn them on, **Winlink position reports**, and the gold **gone quiet** ring. Install steps are written out once, on the Installation page. Headings that started with a symbol were renamed so the in-page links land on the right section.
+
 ## Nov 4, 2026: 1.6.3-beta
 - **FT8 downloads only when you tap Fetch FT8 now.** Turning the switch on, moving the map, and the old center-square check no longer contact PSKReporter, and they no longer start the 5-minute wait. An empty saved result (such as 0 spots) does not lock the button either.
-- **The query asks for stations in the fields you can see.** Each request is one 2-letter Maidenhead field, `senderCallsign` plus `modify=grid`, mode FT8, the last 15 minutes. A 4-character square at the map center was the wrong question: `HN14` is a patch of the North Atlantic and correctly comes back with no FT8 spots, while `CN`, `DN`, `DM`, and `EM` come back full. One request cannot take two fields (`EM,FN` is empty), so a wide view still fetches the 4 fields nearest the center and says so. Zoom in and tap again for the rest.
+- **The button asks for stations in the fields you can see.** A field is a big two-letter square, such as EM. Each request is one field, for stations transmitting from that field, mode FT8, the last 15 minutes. The old center-square question was wrong: `HN14` is a patch of the North Atlantic and correctly comes back empty, while fields such as CN, DN, DM, and EM come back with stations. One request cannot name two fields, so a wide view still fetches the 4 nearest the center and says so. Zoom in and tap again for the rest.
 
 ## Nov 4, 2026: 1.6.2-beta
-- **Fetch FT8 now.** The button loads FT8 spots for the 2-letter Maidenhead fields covering the map (PSKReporter `modify=grid`, mode FT8, last 15 minutes). If the view spans more than 4 fields, it fetches the 4 nearest the center and says so. Fields are requested one after another. The button then waits 5 minutes and shows **Cached, refresh available in Xm**. The quiet background check is still only the square at the middle of the map.
+- **Fetch FT8 now** was added. It loaded up to 4 two-letter fields, then waited 5 minutes. This version still ran a background check of the square at the middle of the map, and that check shared the wait with the button. **1.6.3 removed that background check.**
 
 ## Nov 4, 2026: 1.6.1-beta
-- **The red and purple squares are aprs.fi's, not FT8.** When you zoom out, aprs.fi paints "most active areas" (blue quieter, red busier). **Activity squares** is off, so that fill is hidden. Turn it on for a faint outline only.
-- **FT8 stays light.** Zoomed in, stations are small teal dots drawn under the APRS and MeshCore markers. Zoomed out, each grid is one count bubble, and at most a few hundred are drawn. The download is still one grid at the middle of the map, at most every 5 minutes, and only while FT8 spots is on. Moving the map waits a moment before redrawing, so the page does not stall.
+- **The red and purple squares are aprs.fi's, not FT8.** When you zoom out, aprs.fi paints "most active areas" (blue quieter, red busier). **Activity squares** is off, so that fill is hidden. Turn it on for a faint outline only. This is still how it works.
+- **FT8 drawing.** Zoomed in, stations are small teal dots under the APRS and MeshCore markers. Zoomed out, each grid is one count bubble. This version still downloaded one square at the middle of the map on its own. **1.6.3 downloads only when you tap Fetch FT8 now.**
 
 ## Nov 4, 2026: 1.6.0-beta
 - **Gone quiet.** MeshCore repeaters and room servers that have not advertised for longer than **Quiet after** get a gold ring. The default is 24 hours. Other choices are 12 hours, 3 days, and 7 days. The popup says **Silent for Xd Yh**. **Gone quiet in view** lists those radios on the map you are looking at. This uses the last-heard time already downloaded. It does not check the network any more often. Turn **Flag gone-quiet repeaters** off to hide the rings and the list.
 - **Winlink position reports.** GPS reports that Winlink copies onto APRS (source **WINLINK**, destination **APWL2K**, the P in a red diamond) get a blue ring. The switch shows or hides them. aprs.fi's own info box is left as it is. Winlink gateways are not touched. No extra download.
-- **FT8 spots,** off until you turn it on. Teal dots from [PSKReporter](https://www.pskreporter.info/pskdev.html) for the grid square at the middle of the map (`modify=grid`, mode FT8). At most one query every 5 minutes, and the last answer is reused until that time is up. Tap a dot for callsign, band, SNR, time, and who heard them. The dot is the middle of the grid square, not a GPS fix.
+- **FT8 spots** were added, off until you turn them on. This first version asked only for the grid square at the middle of the map. **1.6.3 replaced that** with **Fetch FT8 now** and up to 4 fields in view. The dot is still the middle of the grid square, not a GPS fix.
 
 ## Nov 3, 2026: 1.5.0-beta
 - **Coverage colours are easier to tell apart.** Signal strength used to be a dark and a light shade of the same colour. It is now **green** for strong (at least 10 dB to spare, after the fade margin), **yellow** for fair (5 to 10 dB), and **orange** for weak (0 to 5 dB). Nothing is drawn below 0 dB. The colours also differ in lightness. A **Strong / Fair / Weak** legend sits on the Coverage tab and at the bottom-left of the map while coverage is showing. Older saved maps are worked out again so the new colours apply.
@@ -62,7 +67,7 @@
 - Clear saved results now also clears the saved terrain.
 
 ## Nov 2, 2026: 1.1.0-beta
-- New default **Signal strength** coverage map: free-space/ground-reflection loss plus Deygout knife-edge diffraction over up to 3 ridges, checked against a LoRa link budget. Solid = strong (≥10 dB to spare), light = weak (0-10 dB), clear = unlikely.
+- New default **Signal strength** coverage map: loss over distance, bounce off the ground, and bending over up to 3 ridges, checked against a typical MeshCore radio. The two-shade colours in this note were replaced in **1.5.0** (green, yellow, and orange).
 - Uses each node's own frequency, SF and bandwidth from map.meshcore.io when it reports them, otherwise the MeshCore US default (910.525 MHz, SF7, 62.5 kHz, about -127.5 dBm).
 - New **Map shows** choice (Signal strength / Clear view only). Repeater power (22 dBm) and Antenna gain (3 dBi each) are under Advanced. All have ⓘ info buttons.
 - The old line-of-sight check is still there as *Clear view only*. The 100 m hillside fix applies to both modes.

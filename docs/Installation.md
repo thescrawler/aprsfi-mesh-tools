@@ -64,13 +64,14 @@ On a phone? Skip to [Installing on a phone](#installing-on-a-phone).
 
 ### About the permission prompts
 
-The first time the script downloads data, Tampermonkey may ask whether it can connect to another website. The script only connects to these three domains, which are declared in its header:
+The first time the script downloads data, Tampermonkey may ask whether it can connect to another website. The script only connects to these four sites, which are named in its header:
 
-| Domain | Why |
+| Site | Why |
 |---|---|
 | `map.meshcore.io` | List of MeshCore radios |
 | `meshmap.net` | List of Meshtastic radios |
 | `s3.amazonaws.com` | Terrain (hill height) tiles for coverage |
+| `retrieve.pskreporter.info` | FT8 spots, and only after you tap **Fetch FT8 now** |
 
 Choose **Always allow** (or **Always allow domain**) for each. See [Privacy and data sources](Privacy-and-Data-Sources.md) for details.
 
@@ -83,21 +84,12 @@ Chrome on a phone **can't run extensions**, so Tampermonkey won't work there. Us
 1. Install **Firefox** or **Microsoft Edge** from the Google Play Store. (Kiwi Browser also works, but Tampermonkey says it is no longer updated, so Firefox or Edge is safer.)
 2. In that browser, add **Tampermonkey**: in Firefox tap **⋮**, then **Extensions**, and search for Tampermonkey. In Edge tap **☰**, then **Extensions**, and add Tampermonkey.
 
-Then install Mesh Tools with **Import from URL**. This is the reliable way on a phone, including when a link only shows code. First you have to open Tampermonkey's **Utilities** page. Menus vary a little, so the names below are the usual ones.
+Then install Mesh Tools with **Import from URL**. Firefox can follow the six steps at the top of this page. Edge and Kiwi use the same link and the same **Utilities** page. Open the Dashboard like this:
 
-1. Long-press the link below and choose **Copy link** (or copy it from the box).
+- **Edge:** usually the **⋮** menu, then **Extensions**, then **Tampermonkey**, then **Dashboard**.
+- **Kiwi:** usually the same path as Edge. Tampermonkey lists Kiwi only for an old version and says it is no longer updated, so Firefox or Edge is safer.
 
-```
-https://raw.githubusercontent.com/thescrawler/aprsfi-mesh-tools/main/aprsfi-mesh-tools.user.js
-```
-
-2. Open the **Dashboard**.
-   - **Firefox:** tap the **⋮** menu, then **Extensions** (older Firefox says **Add-ons**), then **Tampermonkey**. Or tap the Tampermonkey icon and choose **Dashboard**.
-   - **Edge:** usually the **⋮** menu, then **Extensions**, then **Tampermonkey**, then **Dashboard**.
-   - **Kiwi:** usually the same path as Edge. Tampermonkey lists Kiwi only for an old version and says it is no longer updated, so Firefox or Edge is safer.
-3. At the top of the Dashboard, tap the **Utilities** tab. On a small screen the tabs are in a row you slide sideways. Keep sliding until **Utilities** appears. Tampermonkey's help says that if the tab is hidden, set **Config mode** to **Beginner** or **Advanced**.
-4. On that page, find **Import from URL**. Paste the link and tap **Install**.
-5. Tap **Install** again on the confirm page, then open <https://aprs.fi>.
+On a small screen, slide the tab row at the top of the Dashboard until **Utilities** shows. If that tab is missing, Tampermonkey's help says to set **Config mode** to **Beginner** or **Advanced**.
 
 ### iPhone / iPad
 
